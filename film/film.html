@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>点线面 · 需求管理全流程</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+:root{--ground:#F1EEE6;--ink:#1E221C;--mute:#8B8C80;--l2:#B3B8A2;--l3:#6E7856;--l4:#343D29;--c1:#F7E6D2;--c3:#E57A32;--c4:#B4521F}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--ground);font-family:"MiSans VF",system-ui,sans-serif;color:var(--ink)}
+canvas{position:absolute;inset:0}
+#ov{position:absolute;inset:0;pointer-events:none}
+#lines{position:absolute;inset:0}
+.blk{position:absolute;will-change:clip-path,transform}
+.eb{font-size:22px;letter-spacing:.14em;color:var(--mute);font-weight:500}
+.hd{font-size:64px;font-weight:650;letter-spacing:-.025em;line-height:1.08;margin-top:14px}
+.hd .n{font-weight:250;letter-spacing:-.04em}
+.bd{font-size:26px;line-height:1.6;color:#55574D;margin-top:18px}
+.bd b{color:var(--ink);font-weight:600}
+.an{position:absolute;font-size:22px;line-height:1.45;color:#55574D;white-space:nowrap;background:rgba(241,238,230,.9);padding:8px 14px 10px;border-radius:6px}
+.an .v{display:block;font-size:40px;font-weight:300;letter-spacing:-.02em;color:var(--ink);line-height:1.1}
+.an .v.o{color:var(--c4)} .an .v.g{color:var(--l4)}
+.src{position:absolute;left:110px;bottom:56px;font-size:18px;color:var(--mute)}
+.grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:multiply;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='3' seed='5'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E")}
+.vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 48%,transparent 55%,rgba(60,50,30,.10) 100%)}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js"}}</script>
+</head>
+<body>
+<div id="ov"><svg id="lines" viewBox="0 0 1920 1080"></svg></div>
+<div class="vig"></div><div class="grain"></div>
+<script type="module">
+import * as THREE from 'three';
+await document.fonts.load('600 64px "MiSans VF"','需求工具专才日活评审通过开发上线推广效果无记录部门评估团队长审核员工提出');
+
+/* ───────── 工具：缓动 / 弹簧 / 时间窗 ───────── */
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;            // 镜头：三次 in-out
+const exo=x=>x===1?1:1-Math.pow(2,-10*x);                    // 落定：指数 out（Keynote 手感）
+const crit=(t,w=9)=>t<=0?0:1-(1+w*t)*Math.exp(-w*t);         // 临界阻尼弹簧（无回弹）
+const lerp=(a,b,x)=>a+(b-a)*x;
+let seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+
+/* ───────── 渲染器 / 光 ───────── */
+const C={ground:0xF1EEE6,l1:0xE3E5DA,l2:0xB3B8A2,l3:0x6E7856,l4:0x343D29,c1:0xF7E6D2,c2:0xF2C27E,c3:0xE57A32,c4:0xB4521F,ink:0x1E221C};
+const R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});R.setSize(1920,1080);R.setPixelRatio(1);
+R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;R.outputColorSpace=THREE.SRGBColorSpace;
+R.toneMapping=THREE.ACESFilmicToneMapping;R.toneMappingExposure=1.08;R.localClippingEnabled=true;
+document.body.prepend(R.domElement);
+const scene=new THREE.Scene();scene.background=new THREE.Color(C.ground);
+scene.add(new THREE.HemisphereLight(0xFFF8EE,0xD8D0C0,1.25));
+const sun=new THREE.DirectionalLight(0xFFE6C8,2.1);sun.position.set(-30,40,-22);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-70,right:70,top:40,bottom:-40,near:1,far:160});
+sun.shadow.radius=5;sun.shadow.bias=-.0005;scene.add(sun);sun.target.position.set(10,0,0);scene.add(sun.target);
+const M=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.86,metalness:0,...o});
+
+/* 桌面：暖纸 + 极淡铅笔网格（Agnes Martin） */
+(()=>{const cv=document.createElement('canvas');cv.width=cv.height=1024;const x=cv.getContext('2d');
+  x.fillStyle='#F1EEE6';x.fillRect(0,0,1024,1024);x.strokeStyle='rgba(30,34,28,.07)';x.lineWidth=1.2;
+  for(let i=0;i<=1024;i+=64){x.beginPath();x.moveTo(i+.5,0);x.lineTo(i+.5,1024);x.stroke();x.beginPath();x.moveTo(0,i+.5);x.lineTo(1024,i+.5);x.stroke();}
+  const tex=new THREE.CanvasTexture(cv);tex.wrapS=tex.wrapT=THREE.RepeatWrapping;tex.repeat.set(25,25);tex.colorSpace=THREE.SRGBColorSpace;tex.anisotropy=8;
+  const g=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({map:tex,roughness:.95}));
+  g.rotation.x=-Math.PI/2;g.receiveShadow=true;scene.add(g);})();
+
+/* 桌面印字（平放在纸上的标签） */
+function label(txt,{size=96,weight=600,color='#1E221C',w=1024,h=160,align='left'}={},wx=6){
+  const cv=document.createElement('canvas');cv.width=w;cv.height=h;const x=cv.getContext('2d');
+  x.font=`${weight} ${size}px "MiSans VF"`;x.fillStyle=color;x.textAlign=align;x.textBaseline='middle';
+  x.fillText(txt,align==='left'?4:align==='center'?w/2:w-4,h/2);
+  const t=new THREE.CanvasTexture(cv);t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=8;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(wx,wx*h/w),new THREE.MeshBasicMaterial({map:t,transparent:true,depthWrite:false}));
+  m.rotation.x=-Math.PI/2;scene.add(m);return m;}
+
+/* ═════════ 段 1 · 点：1500 个工具 ═════════ */
+const COLS=50,ROWS=30,SP=.5,FX=-18,FZ=0;
+const geo=new THREE.CylinderGeometry(.13,.13,1,18);geo.translate(0,.5,0);
+const dots=new THREE.InstancedMesh(geo,M(0xffffff,{roughness:.6}),COLS*ROWS);dots.castShadow=true;dots.receiveShadow=true;
+const active=new Set();while(active.size<200)active.add(Math.floor(rnd()*COLS*ROWS));
+const dInfo=[];const tmpM=new THREE.Matrix4(),tmpC=new THREE.Color();
+for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){const i=r*COLS+c;const x=FX+(c-(COLS-1)/2)*SP,z=FZ+(r-(ROWS-1)/2)*SP;
+  const a=active.has(i);dInfo.push({x,z,a,delay:(c/COLS)*.9+rnd()*.35});dots.setColorAt(i,tmpC.set(a?C.l3:C.l2));}
+scene.add(dots);
+function updDots(t){const rise=t-4.6;for(let i=0;i<dInfo.length;i++){const d=dInfo[i];
+  const h=d.a?lerp(.06,1.25,crit(rise-d.delay,6)):.06;tmpM.makeScale(1,h,1);tmpM.setPosition(d.x,0,d.z);dots.setMatrixAt(i,tmpM);}
+  dots.instanceMatrix.needsUpdate=true;}
+
+/* ═════════ 段 2 · 需求流向（Minard 实体色带） ═════════ */
+const ST=[['员工提出',0],['团队长审核',12],['部门评估',22],['开发',32],['上线',40],['推广',48],['效果',56]];
+ST.forEach(([n,x],i)=>{const on=i<3;const l=label(n,{size:84,weight:on?650:500,color:on?'#1E221C':'#9C9D90'},7);l.position.set(x+3.3,.02,-6.2);
+  const tk=new THREE.Mesh(new THREE.BoxGeometry(.06,.02,.9),new THREE.MeshBasicMaterial({color:on?C.ink:C.l2}));tk.position.set(x,.01,-5.2);scene.add(tk);
+  if(!on){const q=label('无记录',{size:80,weight:600,color:'#B4521F'},3.6);q.position.set(x+1.8,.02,-4.4);}});
+function bandShape(x0,x1,top,bot,n=60){const s=new THREE.Shape();
+  for(let i=0;i<=n;i++){const x=lerp(x0,x1,i/n);const y=top(x);i?s.lineTo(x,y):s.moveTo(x,y);}
+  for(let i=n;i>=0;i--){const x=lerp(x0,x1,i/n);s.lineTo(x,bot(x));}return s;}
+const sm=(a,b,x0,x1)=>x=>lerp(a,b,eio(clamp((x-x0)/(x1-x0))));
+function slab(shape,h,mat){const g=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:true,bevelThickness:.04,bevelSize:.04,bevelSegments:2,curveSegments:24});
+  g.rotateX(-Math.PI/2);const m=new THREE.Mesh(g,mat);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;}
+const clipX=new THREE.Plane(new THREE.Vector3(-1,0,0),-100);
+const mBand=M(C.l3,{roughness:.7,clippingPlanes:[clipX],clipShadows:true});
+// 800 → 宽 8；在审核附近，下沿 80% 分出（未通过），上沿 20% 收窄成 1.6 继续
+const passLo=x=>x<9?-4:x<12?lerp(-4,2.4,eio((x-9)/3)):lerp(2.4,-.8,eio(clamp((x-12)/8)));
+const passHi=x=>x<12?4:lerp(4,.8,eio(clamp((x-12)/8)));
+slab(bandShape(0,22,passHi,passLo,120),.42,mBand);
+const mRej=M(C.l3,{roughness:.8,transparent:true,clippingPlanes:[clipX],clipShadows:true});
+const rejHi=x=>x<12?passLo(x):lerp(2.4,-6,eio(clamp((x-12)/13)));
+const rejLo=x=>lerp(-4,-12.4,eio(clamp((x-9)/16)));
+const rej=slab(bandShape(9,27,rejHi,rejLo,120),.36,mRej);
+// 评估之后：只剩轮廓（虚线框），越往后越淡
+const ghost=new THREE.Group();scene.add(ghost);
+for(let k=0;k<17;k++){const x0=22+k*2,x1=x0+1.2;const w=.8+k*.05;const op=Math.max(0,.75-k*.045);
+  const mat=new THREE.LineBasicMaterial({color:C.l4,transparent:true,opacity:op});
+  [[x0,-w,x1,-w],[x0,w,x1,w]].forEach(([a,b,c,d])=>{const g=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(a,.42,b),new THREE.Vector3(c,.42,d)]);
+    const l=new THREE.Line(g,mat);l.userData.x=x0;ghost.add(l);});}
+
+/* ═════════ 镜头：俯视（看起来是平面）→ 倾斜（显出立体）→ 沿流向推进 ═════════ */
+const cam=new THREE.PerspectiveCamera(24,1920/1080,.1,600);
+const KEYS=[ // t, pos, target, fov
+  [0.0,[-25.5,72,7],[-25.5,0,0],22],
+  [3.2,[-25.5,66,7],[-25.5,0,0],22],
+  [8.0,[-27,16,22],[-25,0,-1],32],
+  [11.5,[-25.5,15,21],[-23.5,0,-1],32],
+  [15.0,[5,21,28],[3,0,-4],34],
+  [19.5,[20,19,26],[16,0,-3],34],
+  [24.0,[25,18,25],[21,0,-3],34]];
+function camAt(t){let i=0;while(i<KEYS.length-2&&t>KEYS[i+1][0])i++;const a=KEYS[i],b=KEYS[i+1];const x=eio(win(t,a[0],b[0]));
+  cam.position.set(...a[1].map((v,j)=>lerp(v,b[1][j],x)));cam.fov=lerp(a[3],b[3],x);cam.updateProjectionMatrix();
+  cam.lookAt(...a[2].map((v,j)=>lerp(v,b[2][j],x)));cam.updateMatrixWorld();}
+
+/* ═════════ 叠层文字：块 + 指向 3D 锚点的注记线 ═════════ */
+const ov=document.getElementById('ov'),SV=document.getElementById('lines');
+function blk(html,css){const d=document.createElement('div');d.className='blk';d.innerHTML=html;Object.assign(d.style,css);ov.appendChild(d);return d;}
+function ann(html,anchor,dx,dy){const d=document.createElement('div');d.className='an';d.innerHTML=html;ov.appendChild(d);
+  const ln=document.createElementNS('http://www.w3.org/2000/svg','path');ln.setAttribute('fill','none');ln.setAttribute('stroke','#1E221C');ln.setAttribute('stroke-width','1.2');ln.setAttribute('opacity','.55');SV.appendChild(ln);
+  const dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('r','4');dot.setAttribute('fill','#1E221C');SV.appendChild(dot);
+  return {d,ln,dot,anchor:new THREE.Vector3(...anchor),dx,dy};}
+const proj=v=>{const p=v.clone().project(cam);return[(p.x+1)/2*1920,(1-p.y)/2*1080];};
+// 揭示：从左往右的遮罩擦出（不是淡入，也不是飞入）
+function reveal(el,p){el.style.clipPath=`inset(-20px ${100-100*p}% -20px -20px)`;el.style.transform=`translateX(${(1-p)*-14}px)`;}
+function hide(el,p){el.style.clipPath=`inset(-20px -20px -20px ${100*p}%)`;}
+function drawAnn(a,p,q=0){if(p<=0||q>=1){a.d.style.visibility='hidden';a.ln.style.visibility='hidden';a.dot.style.visibility='hidden';return;}
+  a.d.style.visibility=a.ln.style.visibility=a.dot.style.visibility='visible';
+  const [x,y]=proj(a.anchor);const lx=x+a.dx,ly=y+a.dy;
+  const d=`M${x},${y} L${lx},${ly} L${lx+(a.dx>0?24:-24)},${ly}`;a.ln.setAttribute('d',d);
+  const L=Math.abs(a.dx)+Math.abs(a.dy)+60;a.ln.setAttribute('stroke-dasharray',L);a.ln.setAttribute('stroke-dashoffset',L*(1-clamp(p*1.6)));
+  a.dot.setAttribute('cx',x);a.dot.setAttribute('cy',y);a.dot.setAttribute('r',4*exo(clamp(p*3)));
+  const tx=a.dx>0?lx+32:lx-32-a.d.offsetWidth;a.d.style.left=tx+'px';a.d.style.top=(ly-a.d.offsetHeight/2)+'px';
+  const pp=clamp((p-.35)/.65);a.d.style.clipPath=a.dx>0?`inset(-10px ${100-100*exo(pp)}% -10px -10px)`:`inset(-10px -10px -10px ${100-100*exo(pp)}%)`;
+  if(q>0){a.d.style.opacity=1-q;a.ln.setAttribute('opacity',.55*(1-q));a.dot.setAttribute('opacity',1-q);}else{a.d.style.opacity=1;a.ln.setAttribute('opacity',.55);a.dot.setAttribute('opacity',1);}}
+
+const B1=blk(`<div class="eb">现状 · 我们有什么</div><div class="hd"><span class="n">1500+</span> 个智能工具</div>
+  <div class="bd">由一线员工基于<b>单点场景</b>自发孵化。<br>俯视看，它们是一片均匀的点。</div>`,{left:'110px',top:'120px',width:'760px'});
+const B2=blk(`<div class="eb">侧过来看</div><div class="hd">真正每天在用的，<br><span class="n">200+</span></div>
+  <div class="bd">其余多数只在一个场景里用过，<b>难复制、难推广</b>，<br>与主流程脱节，形不成串联。<br><br><span style="font-size:22px;color:#8B8C80">背后是 <b>1000+</b> 名经总部数科认证的数字化专才，人均一个工具。</span></div>`,{left:'110px',top:'120px',width:'820px'});
+const B3=blk(`<div class="eb">需求的去向</div><div class="hd"><span class="n">800+</span> 条需求，去了哪里？</div>
+  <div class="bd">借米纳德流图：色带的宽度，就是需求的数量。</div>`,{left:'110px',top:'120px',width:'900px'});
+const B4=blk(`<div class="hd" style="font-size:52px">评估之后，色带就看不见了。</div>
+  <div class="bd">开发了没有、上线了没有、效果如何——<b>没有数字</b>。<br>审批只回答「做不做」，没有人对「做成没有」负责。</div>`,{left:'110px',top:'790px',width:'1100px'});
+const SRC=blk('数据：1500+ 智能工具、日活 200+、1000+ 认证数字化专才、800+ 业务需求、评审通过率 20%；160 / 640 按比例估算。',{});SRC.className='src';
+const A1=ann('<span class="v g">1000+</span>名认证数字化专才 · 人均 1 个工具',[FX+3,.1,FZ+1],380,210);
+const A2=ann('<span class="v g">日活 200+</span>立起来的，是每天有人用的工具',[FX-1,1.25,FZ-3],140,-150);
+const A3=ann('<span class="v">800+</span>条业务需求',[1,.42,-3.5],-60,-170);
+const A4=ann('<span class="v g">约 160</span>评审通过 20%',[21,.42,-.8],40,-190);
+const A5=ann('<span class="v" style="color:#8B8C80">约 640</span>未通过——背后的问题，也没有被记录',[21,.3,7],240,-20);
+const A6=ann('<span class="v o">?</span>开发 · 上线 · 推广 · 效果：无记录',[31,.42,0],-60,210);
+
+/* ═════════ 主时间线 ═════════ */
+window.T=24.5;
+window.render=t=>{
+  camAt(t);updDots(t);
+  // 色带：随镜头推进从左往右长出（裁切面移动）
+  const bx=lerp(-1,22.2,eio(win(t,12.2,16.6)));clipX.constant=bx;
+  // 未通过的分支：长出后下沉、变淡
+  const rs=win(t,16.4,19.5);rej.position.y=-.3*eio(rs);mRej.opacity=lerp(1,.4,eio(rs));mRej.color.set(C.l3).lerp(new THREE.Color(C.l2),eio(rs));
+  // 幽灵轮廓：沿 x 依次出现
+  const gx=lerp(22,60,eio(win(t,17.2,21.5)));ghost.children.forEach(l=>l.visible=l.userData.x<gx);
+  // 文字块
+  reveal(B1,exo(win(t,.4,1.4)));if(t>3.6)hide(B1,eio(win(t,3.6,4.4)));B1.style.display=t>4.4?'none':'block';
+  B2.style.display=(t>5.2&&t<12.6)?'block':'none';reveal(B2,exo(win(t,5.6,6.8)));if(t>11.6)hide(B2,eio(win(t,11.6,12.4)));
+  B3.style.display=t>12.4?'block':'none';reveal(B3,exo(win(t,12.8,13.9)));
+  B4.style.display=t>19.6?'block':'none';reveal(B4,exo(win(t,19.8,21)));
+  SRC.style.opacity=clamp((t-1)/.8);
+  drawAnn(A1,0);drawAnn(A2,win(t,7.6,8.8),win(t,11.4,12.2));
+  drawAnn(A3,win(t,13.4,14.4),win(t,16.4,17.2));drawAnn(A4,win(t,16.2,17.2));drawAnn(A5,win(t,17.4,18.4));drawAnn(A6,0);
+  R.render(scene,cam);
+};
+window.render(+(new URLSearchParams(location.search).get('t')||0));
+window.__ready=true;
+</script>
+</body>
+</html>
