@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>改多深 · 关键帧</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#F4F1EA}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+(async()=>{
+await document.fonts.ready;
+const c=document.getElementById('c'),x=c.getContext('2d');
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',BODY='#55574D',GR='#6E7856',GRL='#B3B8A2',OR='#E57A32',OR4='#B4521F',YE='#EDB33B';
+const FONT='"MiSans VF","PingFang SC",sans-serif';
+function T(s,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||20}px ${FONT}`;x.fillStyle=o.c||INK;x.textAlign=o.a||'left';x.letterSpacing=(o.ls||0)+'px';x.fillText(s,X,Y);x.restore();}
+let sd=3;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+x.fillStyle=P;x.fillRect(0,0,1920,1080);
+const n=document.createElement('canvas');n.width=480;n.height=270;const ng=n.getContext('2d');const im=ng.createImageData(480,270);for(let i=0;i<480*270;i++){const v=215+R()*40;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+x.save();x.globalCompositeOperation='multiply';x.globalAlpha=.18;x.drawImage(n,0,0,1920,1080);x.restore();
+x.strokeStyle='rgba(30,34,28,.045)';for(let i=40;i<1920;i+=40){x.beginPath();x.moveTo(i+.5,0);x.lineTo(i+.5,1080);x.stroke();}for(let i=40;i<1080;i+=40){x.beginPath();x.moveTo(0,i+.5);x.lineTo(1920,i+.5);x.stroke();}
+
+T('变化 2 · 从「过 / 不过」，到「改多深」',110,92,{s:22,w:600,c:MUTE,ls:3});
+T('需求评审：一张问题卡，四道闸门',108,160,{s:54,w:650,ls:-1});
+T('先归因，再按根因落在哪一层，决定改多深。每个出口都有拍板人、资源量级、周期和交付物。周期为推测，问题卡为示意。',112,202,{s:21,c:MUTE});
+
+// 左：问题卡（示意）
+const cx0=110,cy0=270,cw=380,ch=470;
+x.fillStyle='rgba(255,255,255,.55)';x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1.2;x.beginPath();x.roundRect(cx0,cy0,cw,ch,10);x.fill();x.stroke();
+T('问题卡',cx0+24,cy0+44,{s:26,w:650});T('示意',cx0+cw-24,cy0+42,{s:16,c:OR4,a:'right',w:600});
+x.strokeStyle='rgba(30,34,28,.15)';x.beginPath();x.moveTo(cx0+24,cy0+62);x.lineTo(cx0+cw-24,cy0+62);x.stroke();
+[['一线原话','「想要个工具帮我核对保单信息」'],['普遍痛点','3 个岗位都在手工核对同一类信息'],['发生频率','每人每天多次'],['影响程度','占工时、易出错，返工'],['优化效益','节省工时 → 可折算成本'],['根因（归因后）','两套系统数据不通，靠人搬']].forEach(([k,v],i)=>{const y=cy0+104+i*60;
+  T(k,cx0+24,y,{s:17,c:MUTE,w:600});T(v,cx0+24,y+26,{s:19,c:i===5?OR4:INK,w:i===5?650:450});});
+T('← 前线 A 写，职能 1 人一起审',cx0,cy0+ch+34,{s:17,c:BODY});
+
+// 中：四道闸门（判断）
+const GX=560,GW=420,gy=[300,430,560,690];
+const Q=['值不值得做？','问题在一个环节内？','流程本身合理，只是衔接断了？','根因在流程 / 规则 / 岗位本身？'];
+const Qs=['影响面 × 频率 × 效益；资产库里有没有现成的','只涉及一个岗位 / 一个工具','跨多个环节、多个系统','不改流程，问题会反复出现'];
+// 主干：问题卡 → 闸门
+x.strokeStyle=INK;x.lineWidth=1.6;x.beginPath();x.moveTo(cx0+cw,cy0+ch/2);x.bezierCurveTo(cx0+cw+40,cy0+ch/2,GX-40,gy[0],GX,gy[0]);x.stroke();
+x.beginPath();x.moveTo(GX+14,gy[0]);x.lineTo(GX+14,gy[3]);x.stroke();
+Q.forEach((q,i)=>{const y=gy[i];x.fillStyle=P;x.strokeStyle=INK;x.lineWidth=1.6;x.save();x.translate(GX+14,y);x.rotate(Math.PI/4);x.fillRect(-11,-11,22,22);x.strokeRect(-11,-11,22,22);x.restore();
+  T(q,GX+46,y-4,{s:22,w:650});T(Qs[i],GX+46,y+24,{s:16,c:BODY});
+  x.strokeStyle=i===0?GRL:OR;x.lineWidth=i===0?1.6:2.6;x.beginPath();x.moveTo(GX+GW-20,y);x.lineTo(GX+GW+70,y);x.stroke();
+  T(i===0?'否':'是',GX+GW+20,y-10,{s:16,c:MUTE});});
+
+// 右：四个出口（点 / 线 / 面 的图示 + 落地参数）
+const OX=GX+GW+90,OW=1810-OX;
+const OUT=[
+  {n:'不做',tag:'',who:'前线 A + 职能 判定',size:'不投资源',time:'当周出结论',out:'写明原因；问题入库，等聚类',col:GRL},
+  {n:'单点优化',tag:'· 点',who:'前线 B 牵头，专才改现有工具',size:'小：一个工具 / 功能',time:'约 2–4 周',out:'工具改版 + 回原问题验收',col:OR},
+  {n:'全链路优化',tag:'· 线',who:'前线 B 牵头，职能协调跨部门',size:'中：多系统 / 多环节打通',time:'约 1–3 个月',out:'串联方案 + 数据打通',col:OR},
+  {n:'流程重塑',tag:'· 面',who:'3+1 提方案，科技副总监拍板',size:'大：流程 / 规则 / 岗位调整',time:'约一个季度',out:'新流程 + 制度 + 跨线复制',col:OR4}];
+OUT.forEach((o,i)=>{const y=gy[i];const ix=OX+18;
+  // 图示
+  x.save();if(i===0){x.strokeStyle=GRL;x.lineWidth=1.6;x.beginPath();x.arc(ix,y,8,0,7);x.stroke();x.beginPath();x.moveTo(ix-12,y+12);x.lineTo(ix+12,y-12);x.stroke();}
+  if(i===1){x.fillStyle=OR;x.beginPath();x.arc(ix,y,10,0,7);x.fill();}
+  if(i===2){x.strokeStyle=OR;x.lineWidth=3;x.beginPath();x.moveTo(ix-16,y+8);x.lineTo(ix-4,y-8);x.lineTo(ix+6,y+6);x.lineTo(ix+18,y-6);x.stroke();[[-16,8],[-4,-8],[6,6],[18,-6]].forEach(([a,b])=>{x.fillStyle=OR;x.beginPath();x.arc(ix+a,y+b,3.5,0,7);x.fill();});}
+  if(i===3){for(let r=0;r<6;r++){x.strokeStyle=`rgba(${[214,104,44]},${1-r*.13})`;x.lineWidth=1.2;x.beginPath();x.ellipse(ix,y,6+r*3.4,4+r*2.4,0,0,7);x.stroke();}}
+  x.restore();
+  T(o.n,ix+40,y-6,{s:26,w:650,c:i===0?MUTE:INK});if(o.tag){x.font=`650 26px ${FONT}`;const w=x.measureText(o.n).width;T(o.tag,ix+40+w+8,y-6,{s:22,w:650,c:OR4});}
+  T(o.who,ix+40,y+22,{s:17,c:BODY});
+  // 参数行
+  const px=ix+40+330;T(o.size,px,y-8,{s:17,c:INK,w:600});T(o.time+'　|　'+o.out,px,y+18,{s:16,c:BODY});
+  x.strokeStyle='rgba(30,34,28,.1)';x.beginPath();x.moveTo(ix-20,y+56);x.lineTo(1810,y+56);x.stroke();});
+
+// 底部：以前 / 现在 + 一句判断
+x.strokeStyle='rgba(30,34,28,.3)';x.beginPath();x.moveTo(110,850);x.lineTo(1810,850);x.stroke();
+T('以前',110,900,{s:22,w:650,c:MUTE});T('团队长 / 部门凭经验判「过 / 不过」；通过 20%，未通过的问题没有去处；通过的基本都做成一个点。',190,900,{s:20,c:BODY});
+T('现在',110,950,{s:22,w:650,c:OR4});T('按根因所在的层定深度：不做也留下原因入库；同一根因聚得够多，就升级成流程重塑——点，聚成线，聚成面。',190,950,{s:20,c:INK,w:500});
+T('模式创新不是规划出来的，是归因归出来的。',110,1018,{s:26,w:650});
+window.__ready=true;
+})();
+</script></body></html>
