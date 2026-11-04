@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>橘绿配色推敲</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#EDEAE3;font-family:"MiSans VF",system-ui,sans-serif;color:#1E221C}
+.wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;height:100%}
+.p{padding:64px 44px;display:flex;flex-direction:column;position:relative}
+.p h2{font-size:34px;font-weight:650;letter-spacing:-.01em}
+.p .d{font-size:21px;line-height:1.55;margin-top:12px;opacity:.68;min-height:132px}
+.ramp{display:flex;margin-top:26px;border-radius:14px;overflow:hidden;height:64px}
+.ramp div{flex:1}
+.hex{display:flex;font-size:15px;opacity:.6;margin-top:8px}.hex span{flex:1}
+.demo{margin-top:auto;position:relative;height:430px}
+.trk{position:absolute;left:0;right:0;top:40px;height:10px;border-radius:5px;display:flex;overflow:hidden}
+.dot{position:absolute;top:31px;width:28px;height:28px;border-radius:50%}
+.big{position:absolute;left:0;top:110px;font-size:150px;font-weight:250;letter-spacing:-.05em;line-height:1}
+.big b{font-weight:600}
+.lbl{position:absolute;left:4px;top:280px;font-size:24px;line-height:1.5}
+.card{position:absolute;left:0;right:0;bottom:0;height:86px;border-radius:18px;display:flex;align-items:center;padding:0 26px;font-size:24px;font-weight:550;gap:14px}
+.card i{width:14px;height:14px;border-radius:50%;display:inline-block}
+.tag{position:absolute;right:44px;top:64px;font-size:18px;padding:6px 14px;border-radius:99px}
+</style></head><body><div class="wrap">
+
+<!-- 0 之前 -->
+<section class="p" style="background:#F7F5F0;--g:#2E5A3C;--o:#EE6A1F">
+  <span class="tag" style="background:#1E221C;color:#fff">之前</span>
+  <h2>原方案</h2>
+  <div class="d">偏蓝的正绿 + 交通锥橙，饱和度相当、色相互补、面积相当，两色在打架。读起来像状态灯 / 仪表盘：绿＝成功，橙＝警告。</div>
+  <div class="ramp"><div style="background:#2E5A3C"></div><div style="background:#EE6A1F"></div><div style="background:#F7F5F0"></div><div style="background:#1D1B18"></div></div>
+  <div class="hex"><span>#2E5A3C</span><span>#EE6A1F</span><span>#F7F5F0</span><span>#1D1B18</span></div>
+  <div class="demo">
+    <div class="trk"><div style="flex:2;background:var(--g)"></div><div style="flex:4;background:var(--o)"></div></div>
+    <div class="dot" style="left:0;background:var(--g)"></div><div class="dot" style="left:33%;background:var(--o)"></div>
+    <div class="big">20<b style="color:var(--o)">%</b></div>
+    <div class="lbl" style="color:var(--g)">现在已在做<br><span style="color:var(--o)">未来补全</span></div>
+    <div class="card" style="background:#EDE8DF"><i style="background:var(--g)"></i>需求评审<i style="background:var(--o);margin-left:auto"></i></div>
+  </div>
+</section>
+
+<!-- 1 霜后橘园 -->
+<section class="p" style="background:#F3F0E8;color:#1E221C">
+  <span class="tag" style="background:#E57A32;color:#fff">推荐</span>
+  <h2>A 霜后橘园</h2>
+  <div class="d">绿往黄偏、往灰收，退成「有色的墨」；橙是全片唯一的彩色，从果皮浅黄到熟橙一整条明度阶。墨色本身带一点绿，把两色缝在一起。</div>
+  <div class="ramp"><div style="background:#E3E5DA"></div><div style="background:#B3B8A2"></div><div style="background:#6E7856"></div><div style="background:#343D29"></div></div>
+  <div class="hex"><span>#E3E5DA</span><span>#B3B8A2</span><span>#6E7856</span><span>#343D29</span></div>
+  <div class="ramp" style="margin-top:14px"><div style="background:#F7E6D2"></div><div style="background:#F2C27E"></div><div style="background:#E57A32"></div><div style="background:#B4521F"></div></div>
+  <div class="hex"><span>#F7E6D2</span><span>#F2C27E</span><span>#E57A32</span><span>#B4521F</span></div>
+  <div class="demo">
+    <div class="trk"><div style="flex:2;background:#6E7856"></div><div style="flex:4;background:linear-gradient(90deg,#F2C27E,#E57A32 40%,#E57A32)"></div></div>
+    <div class="dot" style="left:0;background:#343D29"></div><div class="dot" style="left:33%;background:#E57A32;box-shadow:inset 0 -6px 0 #B4521F"></div>
+    <div class="big">20<b style="color:#E57A32">%</b></div>
+    <div class="lbl" style="color:#6E7856">现在已在做<br><span style="color:#B4521F">未来补全</span></div>
+    <div class="card" style="background:#E3E5DA"><i style="background:#6E7856"></i>需求评审<i style="background:#E57A32;margin-left:auto"></i></div>
+  </div>
+</section>
+
+<!-- 2 青橘 -->
+<section class="p" style="background:#F5F3EC;color:#22231D">
+  <h2>B 青橘</h2>
+  <div class="d">「橘绿」取未熟橘皮的黄绿，比 A 更鲜、更年轻；橙收成柔和的蜜橘色。两色同属暖色相，像同一颗果子从青到熟。</div>
+  <div class="ramp"><div style="background:#E7EAD2"></div><div style="background:#C3CB8C"></div><div style="background:#7F8F33"></div><div style="background:#45501C"></div></div>
+  <div class="hex"><span>#E7EAD2</span><span>#C3CB8C</span><span>#7F8F33</span><span>#45501C</span></div>
+  <div class="ramp" style="margin-top:14px"><div style="background:#FAEBD9"></div><div style="background:#F6C98E"></div><div style="background:#F08A3C"></div><div style="background:#C7651F"></div></div>
+  <div class="hex"><span>#FAEBD9</span><span>#F6C98E</span><span>#F08A3C</span><span>#C7651F</span></div>
+  <div class="demo">
+    <div class="trk"><div style="flex:2;background:#7F8F33"></div><div style="flex:4;background:#F08A3C"></div></div>
+    <div class="dot" style="left:0;background:#45501C"></div><div class="dot" style="left:33%;background:#F08A3C"></div>
+    <div class="big">20<b style="color:#F08A3C">%</b></div>
+    <div class="lbl" style="color:#7F8F33">现在已在做<br><span style="color:#C7651F">未来补全</span></div>
+    <div class="card" style="background:#E7EAD2"><i style="background:#7F8F33"></i>需求评审<i style="background:#F08A3C;margin-left:auto"></i></div>
+  </div>
+</section>
+
+<!-- 3 深秋 -->
+<section class="p" style="background:#EFE8DC;color:#231E17">
+  <h2>C 深秋</h2>
+  <div class="d">苔绿压深、柿橙压暗，像杂志内页和皮具的颜色：沉、贵、克制。适合大屏投影上要「稳」的场合，活泼度最低。</div>
+  <div class="ramp"><div style="background:#DCD9C6"></div><div style="background:#9DA084"></div><div style="background:#4F5838"></div><div style="background:#2C3220"></div></div>
+  <div class="hex"><span>#DCD9C6</span><span>#9DA084</span><span>#4F5838</span><span>#2C3220</span></div>
+  <div class="ramp" style="margin-top:14px"><div style="background:#F1DCC6"></div><div style="background:#E0A06A"></div><div style="background:#C8592A"></div><div style="background:#933C18"></div></div>
+  <div class="hex"><span>#F1DCC6</span><span>#E0A06A</span><span>#C8592A</span><span>#933C18</span></div>
+  <div class="demo">
+    <div class="trk"><div style="flex:2;background:#4F5838"></div><div style="flex:4;background:#C8592A"></div></div>
+    <div class="dot" style="left:0;background:#2C3220"></div><div class="dot" style="left:33%;background:#C8592A"></div>
+    <div class="big">20<b style="color:#C8592A">%</b></div>
+    <div class="lbl" style="color:#4F5838">现在已在做<br><span style="color:#933C18">未来补全</span></div>
+    <div class="card" style="background:#DCD9C6"><i style="background:#4F5838"></i>需求评审<i style="background:#C8592A;margin-left:auto"></i></div>
+  </div>
+</section>
+</div></body></html>

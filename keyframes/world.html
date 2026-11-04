@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>需求管理全流程 · 桌面世界关键帧</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+:root{--ground:#F3EFE7;--ink:#1D1B18;--mute:#8A847A;--done:#2E5A3C;--add:#EE6A1F}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--ground);font-family:"MiSans VF",system-ui,sans-serif;color:var(--ink)}
+canvas{position:absolute;inset:0}
+.ov{position:absolute;inset:0;pointer-events:none;display:none}
+.ov.on{display:block}
+.cap{position:absolute;left:110px;bottom:110px}
+.cap .no{font-size:26px;letter-spacing:.08em;color:var(--mute);font-weight:500}
+.cap .h{font-size:120px;font-weight:650;letter-spacing:-.03em;line-height:1.05;margin-top:8px}
+.cap .t{font-size:36px;color:#4a453e;margin-top:22px;line-height:1.5}
+.cap .t b{color:var(--add);font-weight:600}
+.big{position:absolute;right:120px;top:300px;font-size:200px;font-weight:650;letter-spacing:-.04em;line-height:1;text-align:right}
+.big small{display:block;font-size:38px;font-weight:450;letter-spacing:0;color:var(--mute);margin-top:34px;line-height:1.55}
+.grain{position:absolute;inset:0;opacity:.045;mix-blend-mode:multiply;pointer-events:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' seed='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E")}
+</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js"}}</script>
+</head>
+<body>
+<div class="ov" id="o1"><div class="big">然后呢？<small>开发了没有？上线了没有？效果怎么样？<br>都看不清。</small></div></div>
+<div class="ov" id="o2"><div class="cap"><div class="no">02 · 需求评审</div><div class="h">先归因，再分流</div>
+  <div class="t">前线 3 人审核、提炼需求，职能 1 人一起把关<br><b>不做</b>，也是一种答案。</div></div></div>
+<div class="ov" id="o3"><div class="cap"><div class="no">需求管理全流程</div><div class="h">首尾相接</div>
+  <div class="t"><b style="color:var(--done)">绿</b>：现在已在做　<b>橙</b>：未来补全</div></div></div>
+<div class="grain"></div>
+<script type="module">
+import * as THREE from 'three';
+import {RoundedBoxGeometry} from '../vendor/RoundedBoxGeometry.js';
+const Q=new URLSearchParams(location.search); const K=+(Q.get('k')||3);
+document.getElementById('o'+K).classList.add('on');
+await document.fonts.load('600 100px "MiSans VF"','需求发生评审开发供给测试上线推广验证总结沉淀不做单点优化全链路流程重塑前线职能0123456');
+
+const C={ground:0xF3EFE7, pad:0xE8E2D7, white:0xFBFAF7, ink:0x2A2622, done:0x2E5A3C, add:0xEE6A1F, grey:0xCFC8BC};
+const r=new THREE.WebGLRenderer({antialias:true}); r.setSize(1920,1080); r.setPixelRatio(1);
+r.shadowMap.enabled=true; r.shadowMap.type=THREE.PCFSoftShadowMap;
+r.outputColorSpace=THREE.SRGBColorSpace; r.toneMapping=THREE.ACESFilmicToneMapping; r.toneMappingExposure=1.05;
+document.body.prepend(r.domElement);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(C.ground);
+
+// 光：初冬上午，低角度暖阳从左后方来，影子长长投向右前方
+scene.add(new THREE.HemisphereLight(0xFFF6EA,0xD9CFC0,1.35));
+const sun=new THREE.DirectionalLight(0xFFE3C2,2.3); sun.position.set(-40,26,-18); sun.castShadow=true;
+sun.shadow.mapSize.set(4096,4096); Object.assign(sun.shadow.camera,{left:-60,right:60,top:45,bottom:-45,near:1,far:150});
+sun.shadow.radius=6; sun.shadow.bias=-0.0004; scene.add(sun);
+
+const mat=(c,o={})=>new THREE.MeshStandardMaterial({color:c,roughness:.82,metalness:0,...o});
+const table=new THREE.Mesh(new THREE.PlaneGeometry(400,400),mat(C.ground,{roughness:.95}));
+table.rotation.x=-Math.PI/2; table.receiveShadow=true; scene.add(table);
+
+// 跑道：体育场形闭环。前边从左往右（01→03），右弯，后边从右往左（04→06），左弯回到起点
+const L=20,R=11, LEN=4*L+2*Math.PI*R;
+function at(s){s=((s%LEN)+LEN)%LEN; const a=2*L, c=Math.PI*R;
+  if(s<a) return {x:-L+s,z:R,dx:1,dz:0};
+  if(s<a+c){const t=(s-a)/R; return {x:L+R*Math.sin(t),z:R*Math.cos(t),dx:Math.cos(t),dz:-Math.sin(t)}}
+  if(s<2*a+c){const u=s-a-c; return {x:L-u,z:-R,dx:-1,dz:0}}
+  const t=(s-2*a-c)/R; return {x:-L-R*Math.sin(t),z:-R*Math.cos(t),dx:-Math.cos(t),dz:Math.sin(t)}}
+const STA=[6,20,34, 2*2*L+Math.PI*R-34+0, 0,0]; // 先占位，下面按坐标求
+const stS=[6,20,34, 2*L+Math.PI*R+6, 2*L+Math.PI*R+20, 2*L+Math.PI*R+34];
+function strip(s0,s1,color,w=.9,h=.14,y=.3,dash=0){
+  const g=new THREE.Group(); const step=.5; const m=mat(color,{roughness:.6});
+  for(let s=s0;s<s1;s+=step){ if(dash && Math.floor((s-s0)/dash)%2) continue;
+    const p=at(s+step/2); const b=new THREE.Mesh(new THREE.BoxGeometry(step+.02,h,w),m);
+    b.position.set(p.x,y,p.z); b.rotation.y=Math.atan2(-p.dz,p.dx); b.castShadow=true; b.receiveShadow=true; g.add(b);}
+  scene.add(g); return g;}
+function flatText(txt,{size=120,weight=650,color='#1D1B18',w=1024,h=256,align='center'}={},wx=8){
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; const x=cv.getContext('2d');
+  x.font=`${weight} ${size}px "MiSans VF"`; x.fillStyle=color; x.textAlign=align; x.textBaseline='middle';
+  txt.split('\n').forEach((ln,i,a)=>x.fillText(ln, align==='left'?8:w/2, h/2+(i-(a.length-1)/2)*size*1.15));
+  const t=new THREE.CanvasTexture(cv); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8;
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(wx,wx*h/w),new THREE.MeshStandardMaterial({map:t,transparent:true,roughness:1}));
+  m.rotation.x=-Math.PI/2; m.receiveShadow=true; scene.add(m); return m;}
+
+// 工位：每个环节一块微微抬起的台面，名字印在桌面外侧
+const NAMES=['需求发生','需求评审','开发供给','测试上线','推广验证','总结沉淀'];
+stS.forEach((s,i)=>{const p=at(s);
+  const pad=new THREE.Mesh(new RoundedBoxGeometry(7.5,.24,5.2,4,.35),mat(C.pad));
+  pad.position.set(p.x,.12,p.z); pad.receiveShadow=true; pad.castShadow=true; scene.add(pad);
+  const out=p.z>0?1:-1; const t=flatText(`0${i+1}  ${NAMES[i]}`,{size:110},9.5);
+  t.position.set(p.x,.02,p.z+out*5.2);});
+
+// 现在 vs 补全：K1 只画到评估为止，后面灰虚线；K2/K3 画全
+const GREEN_END=stS[1]+3;
+if(K===1){ strip(0,GREEN_END,C.done); strip(GREEN_END+1,LEN-2,C.grey,.6,.06,.26,1.2); }
+else { strip(-14,GREEN_END,C.done); strip(GREEN_END,LEN-14,C.add); }
+
+// 需求卡片：实体，带厚度与接触阴影
+function card(s,{lift=.42,color=C.white,dz=0,dx=0,rot=0}={}){const p=at(s);
+  const m=new THREE.Mesh(new RoundedBoxGeometry(3.2,.16,2.2,4,.1),mat(color,{roughness:.5}));
+  m.position.set(p.x+dx,lift,p.z+dz); m.rotation.y=Math.atan2(-p.dz,p.dx)+rot; m.castShadow=true; m.receiveShadow=true; scene.add(m);
+  const lab=flatText('需求',{size:150,weight:600,color:'#1D1B18',w:512,h:256},1.6); lab.position.set(p.x+dx,lift+.09,p.z+dz); lab.rotation.z=rot; return m;}
+
+// 人：棋子。前线＝墨色，职能＝橘色
+function pawn(x,z,color){const prof=[[0,0],[.55,0],[.55,.12],[.32,.22],[.22,.9],[.3,1.0],[0,1.0]].map(([a,b])=>new THREE.Vector2(a,b));
+  const g=new THREE.Group(); const m=mat(color,{roughness:.45});
+  const body=new THREE.Mesh(new THREE.LatheGeometry(prof,40),m); body.castShadow=true; g.add(body);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.34,32,16),m); head.position.y=1.25; head.castShadow=true; g.add(head);
+  g.scale.setScalar(1.25); g.position.set(x,.24,z); scene.add(g); return g;}
+
+// 评审分流：从 02 向场内伸出四条短道
+function fork(){const p=at(stS[1]); const ends=[[-6.2,4.8,'不做',2.2],[-2.1,3.4,'单点优化',0],[2.1,3.4,'全链路优化',0],[6.2,4.8,'流程重塑',0]];
+  ends.forEach(([ex,ez,name,short],i)=>{const sx=p.x, sz=p.z-2.4; const dx=ex, dz=ez-sz; const len=Math.hypot(dx,dz)-short;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(.7,.12,len),mat(i===0?C.grey:C.add,{roughness:.6}));
+    const ang=Math.atan2(dx,dz); b.position.set(sx+Math.sin(ang)*len/2,.3,sz+Math.cos(ang)*len/2); b.rotation.y=ang; b.castShadow=true; scene.add(b);
+    if(i===0){const stop=new THREE.Mesh(new RoundedBoxGeometry(1.6,.5,.3,3,.1),mat(C.grey)); stop.position.set(sx+Math.sin(ang)*len,.45,sz+Math.cos(ang)*len); stop.rotation.y=ang; stop.castShadow=true; scene.add(stop);}
+    const t=flatText(name,{size:120,weight:600,color:i===0?'#8A847A':'#1D1B18'},6); t.position.set(sx+Math.sin(ang)*(len+1.6)+(i===0?-.6:0),.03,sz+Math.cos(ang)*(len+1.6));
+  });}
+
+const cam=new THREE.PerspectiveCamera(30,1920/1080,.1,500);
+if(K===1){ // 现状：卡片停在评估之后，前方轨道虚掉、没入远处
+  card(GREEN_END-1.5); pawn(at(stS[0]).x-1.5,R+2.6,C.done); pawn(at(stS[1]).x-1.8,R+2.6,C.done); pawn(at(stS[1]).x+.6,R+2.8,C.done);
+  scene.fog=new THREE.Fog(C.ground,30,70);
+  cam.fov=34; cam.position.set(-14,7.5,26); cam.lookAt(6,0,9);
+}
+if(K===2){ fork(); card(stS[1]-.5);
+  [[-3.6,R+3.0,C.ink],[-1.6,R+3.6,C.ink],[.4,R+3.4,C.ink],[3.4,R+3.2,C.add]].forEach(([x,z,c])=>pawn(x,z,c));
+  scene.fog=new THREE.Fog(C.ground,40,95);
+  cam.fov=30; cam.position.set(14,16,36); cam.lookAt(-1,0,7);
+}
+if(K===3){ fork();
+  [stS[1]-.5, stS[2]+2, stS[3]+1, stS[4]+3].forEach(s=>card(s));
+  const p6=at(stS[5]); for(let i=0;i<5;i++){const m=new THREE.Mesh(new RoundedBoxGeometry(3.2,.16,2.2,4,.1),mat(i===4?C.add:C.white,{roughness:.5}));
+    m.position.set(p6.x+.2,.32+i*.19,p6.z+.8); m.rotation.y=.05*i; m.castShadow=true; m.receiveShadow=true; scene.add(m);} // 沉淀：一摞资产
+  [[-3.6,R+3.0,C.ink],[-1.6,R+3.6,C.ink],[.4,R+3.4,C.ink],[3.4,R+3.2,C.add]].forEach(([x,z,c])=>pawn(x,z,c));
+  cam.fov=30; cam.position.set(6,62,68); cam.lookAt(2,0,-2);
+}
+r.render(scene,cam);
+window.__ready=true;
+</script>
+</body>
+</html>
