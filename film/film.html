@@ -87,10 +87,10 @@ function updDots(t){const rise=t-4.6;for(let i=0;i<dInfo.length;i++){const d=dIn
   dots.instanceMatrix.needsUpdate=true;}
 
 /* ═════════ 段 2 · 需求流向（Minard 实体色带） ═════════ */
-const ST=[['员工提出',0],['团队长审核',12],['部门评估',22],['开发',32],['上线',40],['推广',48],['效果',56]];
+const NOREC=[];const ST=[['员工提出',0],['团队长审核',12],['部门评估',22],['开发',32],['上线',40],['推广',48],['效果',56]];
 ST.forEach(([n,x],i)=>{const on=i<3;const l=label(n,{size:84,weight:on?650:500,color:on?'#1E221C':'#9C9D90'},7);l.position.set(x+3.3,.02,-6.2);
   const tk=new THREE.Mesh(new THREE.BoxGeometry(.06,.02,.9),new THREE.MeshBasicMaterial({color:on?C.ink:C.l2}));tk.position.set(x,.01,-5.2);scene.add(tk);
-  if(!on){const q=label('无记录',{size:80,weight:600,color:'#B4521F'},3.6);q.position.set(x+1.8,.02,-4.4);}});
+  if(!on){const q=label('无记录',{size:80,weight:600,color:'#9C9D90'},3.6);q.position.set(x+1.8,.02,-4.4);NOREC.push([x,q]);}});
 function bandShape(x0,x1,top,bot,n=60){const s=new THREE.Shape();
   for(let i=0;i<=n;i++){const x=lerp(x0,x1,i/n);const y=top(x);i?s.lineTo(x,y):s.moveTo(x,y);}
   for(let i=n;i>=0;i--){const x=lerp(x0,x1,i/n);s.lineTo(x,bot(x));}return s;}
@@ -123,10 +123,70 @@ const KEYS=[ // t, pos, target, fov
   [11.5,[-25.5,15,21],[-23.5,0,-1],32],
   [15.0,[5,21,28],[3,0,-4],34],
   [19.5,[20,19,26],[16,0,-3],34],
-  [24.0,[25,18,25],[21,0,-3],34]];
+  [24.0,[25,18,25],[21,0,-3],34],
+  [27.5,[5,12,19],[8,0,-2],34],
+  [31.5,[24,24,32],[25,0,-1],40],
+  [34.8,[39.5,15,31],[39.5,0,9.5],32],
+  [44.0,[41,14,30],[40.5,0,9.5],32],
+  [47.5,[42,21,29],[41,0,-2],36],
+  [54.0,[52,19,27],[51,0,-2],36],
+  [58.0,[63,13,19],[58,0,3],34],
+  [63.0,[20,72,44],[16,0,3],34],
+  [68.0,[16,120,6],[16,0,3],32],
+  [76.0,[16,116,6],[16,0,3],32]];
 function camAt(t){let i=0;while(i<KEYS.length-2&&t>KEYS[i+1][0])i++;const a=KEYS[i],b=KEYS[i+1];const x=eio(win(t,a[0],b[0]));
   cam.position.set(...a[1].map((v,j)=>lerp(v,b[1][j],x)));cam.fov=lerp(a[3],b[3],x);cam.updateProjectionMatrix();
   cam.lookAt(...a[2].map((v,j)=>lerp(v,b[2][j],x)));cam.updateMatrixWorld();}
+
+/* ═════════ 段 3 · 3+1：责任线先于建设 ═════════ */
+const team=new THREE.Group();scene.add(team);
+const pins=[];[[5.2,C.ink],[6.4,C.ink],[7.6,C.ink],[9.2,C.c3]].forEach(([x,c],k)=>{const g=new THREE.Group();const m=M(c,{roughness:.45});
+  const stem=new THREE.Mesh(new THREE.CylinderGeometry(.05,.05,1.7,12),m);stem.position.y=.85;stem.castShadow=true;g.add(stem);
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.26,32,16),m);head.position.y=1.8;head.castShadow=true;g.add(head);
+  const base=new THREE.Mesh(new THREE.CylinderGeometry(.32,.36,.08,32),m);base.position.y=.04;base.castShadow=true;g.add(base);
+  g.position.set(x,0,-3.0);team.add(g);pins.push(g);});
+const pinL1=label('前线 3 人',{size:90,weight:650},4.2);pinL1.position.set(6.5,.02,-1.6);
+const pinL2=label('职能 1 人',{size:90,weight:650,color:'#B4521F'},4.2);pinL2.position.set(10.6,.02,-1.6);
+[pinL1,pinL2].forEach(l=>l.material.opacity=0);
+// 责任线：一条细墨线，沿色带远侧从起点一直画到「效果」
+const railPts=[];for(let x=4;x<=57;x+=.5)railPts.push(new THREE.Vector3(x,.03,-3.0));
+const rail=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(railPts),200,.032,8,false),M(0x55574D,{roughness:.6}));scene.add(rail);
+const railN=rail.geometry.index.count;rail.geometry.setDrawRange(0,0);
+
+/* ═════════ 段 4 · 改多深：不做 / 点 / 线 / 面（3D 小样） ═════════ */
+const DEPTH=[];const DP=[[-1.3,-.8],[-.4,-1.6],[.9,-1.2],[1.5,.2],[.6,1.4],[-.9,1.2],[-1.6,.3]];
+['不做','单点优化 · 点','全链路优化 · 线','流程重塑 · 面'].forEach((name,k)=>{const ox=32+k*5.6,oz=10.5;const g=new THREE.Group();g.position.set(ox,0,oz);scene.add(g);
+  const plate=new THREE.Mesh(new THREE.BoxGeometry(4.6,.12,4.6),M(C.l1,{roughness:.9}));plate.position.y=.06;plate.receiveShadow=true;plate.castShadow=true;g.add(plate);
+  const root=new THREE.Mesh(new THREE.BoxGeometry(.42,.42,.42),M(0xFBFAF7,{roughness:.5}));root.position.y=.33;root.castShadow=true;g.add(root);
+  const dts=DP.map(([x,z])=>{const d=new THREE.Mesh(new THREE.CylinderGeometry(.17,.17,1,20).translate(0,.5,0),M(C.l3,{roughness:.55}));
+    d.position.set(x,.12,z);d.scale.y=.25;d.castShadow=true;g.add(d);
+    const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,.2,0),new THREE.Vector3(x,.2,z)]),new THREE.LineBasicMaterial({color:C.ink,transparent:true,opacity:.35}));g.add(ln);return d;});
+  let extra=null;
+  if(k===2){const cv=new THREE.CatmullRomCurve3([0,1,2,3,4].map(i=>new THREE.Vector3(DP[i][0],.42,DP[i][1])));
+    extra=new THREE.Mesh(new THREE.TubeGeometry(cv,120,.11,12,false),M(C.c3,{roughness:.5}));extra.castShadow=true;extra.geometry.setDrawRange(0,0);g.add(extra);}
+  if(k===3){extra=new THREE.Mesh(new THREE.BoxGeometry(4.0,.16,4.0),M(C.c2,{roughness:.6,transparent:true,opacity:.0}));extra.position.y=.2;extra.castShadow=true;g.add(extra);}
+  const lb=label(name,{size:86,weight:650,color:k===0?'#8B8C80':'#1E221C'},4.6);lb.position.set(ox+.1,.02,oz+3.5);
+  DEPTH.push({g,dts,root,plate,extra,k});});
+function updDepth(t){DEPTH.forEach(o=>{const st=35.6+o.k*2.1;const p=crit(t-st,5);
+  if(o.k===0){o.dts.forEach(d=>d.material.color.set(C.l3).lerp(new THREE.Color(C.l2),p));o.plate.position.y=.06-.05*p;}
+  if(o.k===1){const d=o.dts[1];d.scale.y=lerp(.25,2.6,p);d.material.color.set(C.l3).lerp(new THREE.Color(C.c3),clamp(p*1.4));}
+  if(o.k===2){o.extra.geometry.setDrawRange(0,Math.floor(o.extra.geometry.index.count*eio(win(t,st,st+1.4))/6)*6);
+    [0,1,2,3,4].forEach(i=>o.dts[i].material.color.set(C.l3).lerp(new THREE.Color(C.c3),p));}
+  if(o.k===3){o.extra.material.opacity=.92*p;o.extra.position.y=lerp(.12,.34,p);o.dts.forEach(d=>{d.material.color.set(C.l3).lerp(new THREE.Color(C.c4),p);});}});}
+
+/* ═════════ 段 5 · 评估之后：橙色补全，每一段都有人跟 ═════════ */
+const clipO=new THREE.Plane(new THREE.Vector3(-1,0,0),22);
+const mO=M(C.c3,{roughness:.62,clippingPlanes:[clipO],clipShadows:true});
+slab(bandShape(21.9,57,x=>.8,x=>-.8,40),.42,mO);
+const NEW=[['方案 · 资源',32],['跟踪上线',40],['推广使用',48],['验证效果',56]].map(([n,x])=>{const l=label(n,{size:80,weight:650,color:'#B4521F'},3.8);l.position.set(x+1.9,.03,-4.4);l.material.opacity=0;return [x,l];});
+
+/* ═════════ 段 6 · 沉淀：方案一层层沉下来，回流到起点 ═════════ */
+const plates=[];[C.c1,C.c2,C.c1,C.c2,C.c3].forEach((c,k)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(5.2,.2,3.6),M(c,{roughness:.7}));m.castShadow=true;m.receiveShadow=true;
+  m.position.set(60.5,.1+k*.22,0);m.visible=false;scene.add(m);plates.push(m);});
+const loopPts=[[60.5,2.2],[62,8],[57,15.5],[40,17.5],[20,17.5],[2,16],[-3,10],[-2.2,4.6]].map(([x,z])=>new THREE.Vector3(x,.06,z));
+const loop=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(loopPts),300,.16,10,false),M(C.c3,{roughness:.55}));loop.castShadow=true;scene.add(loop);
+const loopN=loop.geometry.index.count;loop.geometry.setDrawRange(0,0);
+const backL=label('沉淀的方案 → 接住下一个问题',{size:80,weight:600,color:'#B4521F',w:1400},9);backL.position.set(30,.03,19.3);backL.material.opacity=0;
 
 /* ═════════ 叠层文字：块 + 指向 3D 锚点的注记线 ═════════ */
 const ov=document.getElementById('ov'),SV=document.getElementById('lines');
@@ -158,6 +218,18 @@ const B3=blk(`<div class="eb">需求的去向</div><div class="hd"><span class="
 const B4=blk(`<div class="hd" style="font-size:52px">评估之后，色带就看不见了。</div>
   <div class="bd">开发了没有、上线了没有、效果如何——<b>没有数字</b>。<br>审批只回答「做不做」，没有人对「做成没有」负责。</div>`,{left:'110px',top:'790px',width:'1100px'});
 const SRC=blk('数据：1500+ 智能工具、日活 200+、1000+ 认证数字化专才、800+ 业务需求、评审通过率 20%；160 / 640 按比例估算。',{});SRC.className='src';
+const B5=blk(`<div class="eb">接下来 · 先有人，再有路</div><div class="hd">3 + 1，从头负责到效果</div>
+  <div class="bd"><b>前线 3 人</b>：把一线反馈理成问题，判断值不值得做、怎么做。<br><b>职能 1 人</b>（业管 · 综管 · 财企）：审核需求，为它争取资源。<br>那条细线，是他们的责任范围——<b>比路先画出来</b>。</div>`,{left:'110px',top:'120px',width:'980px'});
+const B6=blk(`<div class="eb">评审 · 先归因</div><div class="hd">同一个根因，改多深？</div>
+  <div class="bd">以前只有「过 / 不过」，过了基本就是一个点。<br>现在按根因选深度：<b>不做 · 单点 · 全链路 · 流程重塑</b>——点、线、面。</div>`,{left:'110px',top:'120px',width:'1000px'});
+const B7=blk(`<div class="eb">评估之后</div><div class="hd">这一次，色带没有断。</div>
+  <div class="bd">方案和落地计划先定下来，资源同步争取；<br>开发、上线、推广、效果，<b>每一段都有人跟、有数字</b>。</div>`,{left:'110px',top:'120px',width:'960px'});
+const B8=blk(`<div class="eb">总结 · 沉淀</div><div class="hd">做成的方案，沉下来。</div>
+  <div class="bd">下一个相似的问题，不必从头开始。<br>供给留下的经验，让前线把下一个问题提得更准——<b>这才是「双向」</b>。</div>`,{left:'110px',top:'120px',width:'1000px'});
+const B9=blk(`<div class="hd" style="font-size:96px">从点，到线，到面。</div>
+  <div class="bd" style="font-size:28px">议题三 · 从「工具应用」走向「模式创新」</div>
+  <div class="bd" style="font-size:22px;margin-top:26px"><span style="display:inline-block;width:40px;height:8px;border-radius:4px;background:#6E7856;vertical-align:middle;margin-right:10px"></span>现在已在做　　<span style="display:inline-block;width:40px;height:8px;border-radius:4px;background:#E57A32;vertical-align:middle;margin-right:10px"></span>补全</div>`,{left:'110px',bottom:'110px',width:'1200px'});
+const A7=ann('<span class="v">3 + 1</span>前线 3 人（墨）· 职能 1 人（橘）',[7.2,2.3,-3],140,-120);
 const A1=ann('<span class="v g">1000+</span>名认证数字化专才 · 人均 1 个工具',[FX+3,.1,FZ+1],380,210);
 const A2=ann('<span class="v g">日活 200+</span>立起来的，是每天有人用的工具',[FX-1,1.25,FZ-3],140,-150);
 const A3=ann('<span class="v">800+</span>条业务需求',[1,.42,-3.5],-60,-170);
@@ -166,7 +238,7 @@ const A5=ann('<span class="v" style="color:#8B8C80">约 640</span>未通过—�
 const A6=ann('<span class="v o">?</span>开发 · 上线 · 推广 · 效果：无记录',[31,.42,0],-60,210);
 
 /* ═════════ 主时间线 ═════════ */
-window.T=24.5;
+window.T=76;
 window.render=t=>{
   camAt(t);updDots(t);
   // 色带：随镜头推进从左往右长出（裁切面移动）
@@ -178,11 +250,32 @@ window.render=t=>{
   // 文字块
   reveal(B1,exo(win(t,.4,1.4)));if(t>3.6)hide(B1,eio(win(t,3.6,4.4)));B1.style.display=t>4.4?'none':'block';
   B2.style.display=(t>5.2&&t<12.6)?'block':'none';reveal(B2,exo(win(t,5.6,6.8)));if(t>11.6)hide(B2,eio(win(t,11.6,12.4)));
-  B3.style.display=t>12.4?'block':'none';reveal(B3,exo(win(t,12.8,13.9)));
+  B3.style.display=(t>12.4&&t<25.4)?'block':'none';reveal(B3,exo(win(t,12.8,13.9)));if(t>24.4)hide(B3,eio(win(t,24.4,25.2)));
   B4.style.display=t>19.6?'block':'none';reveal(B4,exo(win(t,19.8,21)));
   SRC.style.opacity=clamp((t-1)/.8);
   drawAnn(A1,0);drawAnn(A2,win(t,7.6,8.8),win(t,11.4,12.2));
-  drawAnn(A3,win(t,13.4,14.4),win(t,16.4,17.2));drawAnn(A4,win(t,16.2,17.2));drawAnn(A5,win(t,17.4,18.4));drawAnn(A6,0);
+  drawAnn(A3,win(t,13.4,14.4),win(t,16.4,17.2));drawAnn(A4,win(t,16.2,17.2),win(t,24.2,25));drawAnn(A5,win(t,17.4,18.4),win(t,24.2,25));drawAnn(A6,0);
+  // 段 3
+  B4.style.display=(t>19.6&&t<25.4)?'block':'none';if(t>24.4)hide(B4,eio(win(t,24.4,25.2)));
+  B5.style.display=(t>25.6&&t<34.2)?'block':'none';reveal(B5,exo(win(t,26,27.2)));if(t>33.2)hide(B5,eio(win(t,33.2,34)));
+  pins.forEach((g,k)=>{const p=crit(t-26.2-k*.18,7);g.position.y=lerp(3,.42,p);g.visible=t>26.1+k*.18;});
+  [pinL1,pinL2].forEach(l=>l.visible=false);drawAnn(A7,win(t,27.4,28.4),win(t,33,33.8));
+  rail.geometry.setDrawRange(0,Math.floor(railN*eio(win(t,28.2,32.4))/3)*3);
+  // 段 4
+  B6.style.display=(t>34.4&&t<45.2)?'block':'none';reveal(B6,exo(win(t,34.8,36)));if(t>44.2)hide(B6,eio(win(t,44.2,45)));
+  updDepth(t);
+  // 段 5
+  const ox=lerp(22,57.2,eio(win(t,45.6,53.6)));clipO.constant=ox;
+  ghost.children.forEach(l=>l.visible=l.userData.x<gx&&l.userData.x>ox-1);
+  NOREC.forEach(([x,l])=>l.visible=ox<x+1);NEW.forEach(([x,l])=>l.material.opacity=eio(win(ox,x,x+2.5)));
+  B7.style.display=(t>45.4&&t<55.2)?'block':'none';reveal(B7,exo(win(t,45.8,47)));if(t>54.2)hide(B7,eio(win(t,54.2,55)));
+  // 段 6
+  plates.forEach((m,k)=>{const st=55.4+k*.42;m.visible=t>st;m.position.y=lerp(3.2,.1+k*.22,crit(t-st,8));});
+  loop.geometry.setDrawRange(0,Math.floor(loopN*eio(win(t,58.4,62.6))/3)*3);backL.material.opacity=eio(win(t,61.6,62.8));
+  B8.style.display=(t>55.4&&t<63.6)?'block':'none';reveal(B8,exo(win(t,55.8,57)));if(t>62.6)hide(B8,eio(win(t,62.6,63.4)));
+  // 段 7：回到俯视，整个世界又「变平」成一张图
+  B9.style.display=t>67?'block':'none';reveal(B9,exo(win(t,67.2,68.6)));
+  SRC.style.opacity=t>63?1-clamp((t-63)/.6):clamp((t-1)/.8);
   R.render(scene,cam);
 };
 window.render(+(new URLSearchParams(location.search).get('t')||0));
