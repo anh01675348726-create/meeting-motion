@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>需求管理全流程 · 关键帧</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+/* ───────── 配色：从「一年好景君须记，最是橙黄橘绿时」想象的三个时刻 ───────── */
+:root{ /* A 晨光：初冬上午，暖白桌面，低角度阳光 */
+  --ground:#F7F5F0; --deep:#EEEAE2; --ink:#1D1B18; --mute:#8A847A; --faint:#C9C3B8;
+  --done:#2E5A3C;   /* 橘叶绿：现在已在做 */
+  --add:#EE6A1F;    /* 橘：未来补全 */
+  --add-soft:rgba(238,106,31,.12);
+  --done-soft:rgba(46,90,60,.10);
+}
+body.p-b{ /* B 橘园：叶荫下的淡绿灰底，橙更跳 */
+  --ground:#ECEFE8; --deep:#E1E6DC; --ink:#18201A; --mute:#7C857C; --faint:#BCC5BC;
+  --done:#2F5B3A; --add:#F07A1C; --add-soft:rgba(240,122,28,.14); --done-soft:rgba(47,91,58,.10);
+}
+body.p-c{ /* C 橙黄：午后杏色暖光，墨更深 */
+  --ground:#F5E9D6; --deep:#EEDCC2; --ink:#2A1F15; --mute:#8C7A63; --faint:#D6C2A4;
+  --done:#3F5A2B; --add:#D9571A; --add-soft:rgba(217,87,26,.12); --done-soft:rgba(63,90,43,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:var(--ground)}
+body{font-family:"MiSans VF",system-ui,sans-serif;color:var(--ink);font-weight:400;
+  -webkit-font-smoothing:antialiased;position:relative}
+.frame{position:absolute;inset:0;display:none}
+body.k1 #k1, body.k2 #k2, body.k3 #k3{display:block}
+/* 极淡纸纹 + 一层很轻的低角度光（左上暖、右下略深），不是发光 */
+.atmo{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(118deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 38%, rgba(0,0,0,.035) 100%)}
+.grain{position:absolute;inset:0;pointer-events:none;opacity:.05;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' seed='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E")}
+.eyebrow{font-size:24px;letter-spacing:.06em;color:var(--mute);font-weight:500}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ───────── K1 现状数据：800+ 需求，通过 20% ───────── */
+#k1 .num{position:absolute;left:100px;top:250px;font-size:300px;line-height:.9;font-weight:250;letter-spacing:-.04em}
+#k1 .num small{font-size:120px;font-weight:300;letter-spacing:-.02em}
+#k1 .lbl{position:absolute;left:112px;top:540px;font-size:56px;font-weight:600;letter-spacing:-.01em;line-height:1.25}
+#k1 .lbl b{color:var(--done);font-weight:650}
+#k1 .note{position:absolute;left:112px;top:720px;width:640px;font-size:30px;line-height:1.6;color:var(--mute)}
+#k1 .eyebrow{position:absolute;left:112px;top:110px}
+#slips{position:absolute;left:840px;top:-20px;width:1140px;height:1120px}
+
+/* ───────── 流程轨道（K2 / K3 共用几何，保证镜头间连续） ───────── */
+.title{position:absolute;left:100px;top:96px;font-size:64px;font-weight:650;letter-spacing:-.02em;line-height:1.1}
+.sub{position:absolute;left:104px;top:186px;font-size:28px;color:var(--mute)}
+.legend{position:absolute;right:100px;top:118px;display:flex;gap:40px;font-size:26px;color:var(--mute);align-items:center}
+.legend i{display:inline-block;width:36px;height:6px;border-radius:3px;margin-right:12px;vertical-align:middle}
+.track{position:absolute;left:0;top:0;width:1920px;height:1080px}
+.col{position:absolute;top:356px;width:262px}
+.col .no{font-size:22px;letter-spacing:.08em;color:var(--mute);font-weight:500}
+.col .nm{font-size:40px;font-weight:650;letter-spacing:-.01em;margin-top:6px}
+.col ul{list-style:none;margin-top:22px}
+.col li{font-size:28px;line-height:1.35;margin-bottom:12px;padding-left:22px;position:relative}
+.col li::before{content:"";position:absolute;left:0;top:.5em;width:10px;height:10px;border-radius:50%}
+.col li.d::before{background:var(--done)} .col li.a::before{background:var(--add)}
+.col li.d{color:var(--done);font-weight:550}
+.col li.a{color:var(--ink)}
+.col .who{display:inline-block;margin-top:10px;font-size:22px;font-weight:550;color:var(--add);
+  background:var(--add-soft);padding:6px 14px;border-radius:999px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 12px 22px}
+.chips span{font-size:22px;padding:5px 12px;border-radius:999px;background:var(--deep);color:var(--ink)}
+.chips span.x{color:var(--mute)}
+
+/* K2：现状断点 */
+#k2 .col.off .nm, #k2 .col.off .no{color:var(--faint)}
+#k2 .q{position:absolute;left:1010px;top:470px;font-size:180px;font-weight:650;letter-spacing:-.04em;line-height:1}
+#k2 .q2{position:absolute;left:1020px;top:690px;font-size:34px;line-height:1.6;color:var(--mute)}
+
+/* K3：3+1 作战单元底栏 */
+.unit{position:absolute;left:100px;right:100px;top:842px;height:150px;display:flex;align-items:center;gap:56px;
+  border-radius:28px;background:var(--deep);padding:0 48px}
+.unit .big{font-size:96px;font-weight:300;letter-spacing:-.04em;line-height:1}
+.unit .big b{font-weight:650;color:var(--add)}
+.unit .grp .h{font-size:30px;font-weight:650}
+.unit .grp .h em{font-style:normal;font-weight:450;color:var(--mute);font-size:24px;margin-left:10px}
+.unit .grp .t{font-size:26px;color:var(--mute);margin-top:8px}
+.unit .tail{margin-left:auto;font-size:30px;font-weight:600;text-align:right;line-height:1.35}
+</style>
+</head>
+<body>
+<div class="atmo"></div>
+
+<!-- ═════════ K1 ═════════ -->
+<section class="frame" id="k1">
+  <div class="eyebrow">现状 · 需求侧</div>
+  <div class="num tnum">800<small>+</small></div>
+  <div class="lbl">条业务需求<br>评审通过 <b>20%</b></div>
+  <div class="note">多为点状需求：<br>说不清普遍痛点、发生频率、<br>影响程度、优化效益。</div>
+  <svg id="slips" viewBox="0 0 1140 1120"></svg>
+</section>
+
+<!-- ═════════ K2 ═════════ -->
+<section class="frame" id="k2">
+  <div class="title">现在的需求流程</div>
+  <div class="sub">员工提出 → 团队长审核 → 部门评估，之后没有人一路跟下去</div>
+  <svg class="track" viewBox="0 0 1920 1080" id="trk2"></svg>
+  <div class="col" style="left:100px"><div class="no">01</div><div class="nm">需求发生</div>
+    <ul><li class="d">员工提出</li></ul></div>
+  <div class="col" style="left:390px"><div class="no">02</div><div class="nm">需求评审</div>
+    <ul><li class="d">团队长审核</li><li class="d">部门评估</li></ul></div>
+  <div class="col off" style="left:680px"><div class="no">03</div><div class="nm">开发供给</div></div>
+  <div class="col off" style="left:970px;opacity:0"><div class="no">04</div><div class="nm">测试上线</div></div>
+  <div class="q">然后呢？</div>
+  <div class="q2">开发了没有？上线了没有？效果怎么样？<br>都看不清。</div>
+</section>
+
+<!-- ═════════ K3 ═════════ -->
+<section class="frame" id="k3">
+  <div class="title">需求管理全流程</div>
+  <div class="sub">议题三 · 打通「需求」与「供给」的双向闭环</div>
+  <div class="legend"><span><i style="background:var(--done)"></i>现在已在做</span><span><i style="background:var(--add)"></i>未来补全</span></div>
+  <svg class="track" viewBox="0 0 1920 1080" id="trk3"></svg>
+
+  <div class="col" style="left:100px"><div class="no">01</div><div class="nm">需求发生</div>
+    <ul><li class="d">员工提出</li><li class="a">前线反馈问题</li><li class="a">每条需求可溯源</li></ul>
+    <span class="who">前线</span></div>
+  <div class="col" style="left:390px"><div class="no">02</div><div class="nm">需求评审</div>
+    <ul><li class="d">团队长审核</li><li class="d">部门评估</li><li class="a">问题归因，再分流</li></ul>
+    <div class="chips"><span class="x">不做</span><span>单点优化</span><span>全链路优化</span><span>流程重塑</span></div>
+    <span class="who">前线 · 职能</span></div>
+  <div class="col" style="left:680px"><div class="no">03</div><div class="nm">开发供给</div>
+    <ul><li class="a">明确方案与计划</li><li class="a">协调、争取资源</li></ul>
+    <span class="who">前线 · 定方案</span><br><span class="who">职能 · 争资源</span></div>
+  <div class="col" style="left:970px"><div class="no">04</div><div class="nm">测试上线</div>
+    <ul><li class="a">跟踪开发</li><li class="a">测试上线</li></ul>
+    <span class="who">3+1 共同跟踪</span></div>
+  <div class="col" style="left:1260px"><div class="no">05</div><div class="nm">推广验证</div>
+    <ul><li class="a">推广使用</li><li class="a">验证效果</li></ul>
+    <span class="who">3+1 共同跟踪</span></div>
+  <div class="col" style="left:1550px"><div class="no">06</div><div class="nm">总结沉淀</div>
+    <ul><li class="a">总结效果</li><li class="a">沉淀为资产</li></ul>
+    <span class="who">3+1 共同负责</span></div>
+
+  <div class="unit">
+    <div class="big tnum">3<b>+</b>1</div>
+    <div class="grp"><div class="h">前线 3 人</div><div class="t">审核需求 · 提炼更合理的需求 · 明确方案</div></div>
+    <div class="grp"><div class="h">职能 1 人<em>业管 · 综管 · 财企</em></div><div class="t">审核需求 · 为需求争取资源</div></div>
+    <div class="tail">最小作战单元<br><span style="color:var(--add)">共同对落地效果负责</span></div>
+  </div>
+</section>
+
+<div class="grain"></div>
+<script>
+const q = new URLSearchParams(location.search);
+document.body.classList.add('k'+(q.get('k')||'3'), 'p-'+(q.get('p')||'a'));
+const css = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+const NS='http://www.w3.org/2000/svg';
+const el=(tag,attrs,parent)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent&&parent.appendChild(e);return e};
+// 确定性随机
+let s=7; const rnd=()=>(s=(s*16807)%2147483647)/2147483647;
+
+// K1：800 张需求小纸条铺满右侧、出血到画外；其中 20%（160 张）是绿色＝通过
+(()=>{const svg=document.getElementById('slips');const cols=25,rows=32,w=34,h=26,gx=45.6,gy=35;
+  const idx=[...Array(cols*rows).keys()];for(let i=idx.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]]}
+  const pass=new Set(idx.slice(0,160));
+  for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const i=r*cols+c;
+    el('rect',{x:c*gx,y:r*gy,width:w,height:h,rx:6,fill:pass.has(i)?css('--done'):css('--deep'),
+      opacity:pass.has(i)?0.92:1},svg)}})();
+
+// 轨道几何（K2/K3 同一套）
+const X=[120,410,700,990,1280,1570], Y=330, END=1810;
+function track(svg,mode){
+  const done=css('--done'),add=css('--add'),faint=css('--faint');
+  if(mode==='now'){
+    el('line',{x1:X[0],y1:Y,x2:X[1]+170,y2:Y,stroke:done,'stroke-width':8,'stroke-linecap':'round'},svg);
+    el('line',{x1:X[1]+200,y1:Y,x2:X[3]-60,y2:Y,stroke:faint,'stroke-width':6,'stroke-linecap':'round','stroke-dasharray':'2 18'},svg);
+    [X[0],X[1],X[1]+150].forEach(x=>el('circle',{cx:x,cy:Y,r:13,fill:done},svg));
+    el('circle',{cx:X[2],cy:Y,r:16,fill:css('--ground')},svg);el('circle',{cx:X[2],cy:Y,r:11,fill:'none',stroke:faint,'stroke-width':4},svg);
+  } else {
+    // 已在做：01 起点到 02 中段（员工提出→团队长审核→部门评估）
+    el('line',{x1:X[0],y1:Y,x2:X[1]+120,y2:Y,stroke:done,'stroke-width':8,'stroke-linecap':'round'},svg);
+    el('line',{x1:X[1]+120,y1:Y,x2:END,y2:Y,stroke:add,'stroke-width':8,'stroke-linecap':'round'},svg);
+    X.forEach((x,i)=>el('circle',{cx:x,cy:Y,r:14,fill:i<2?done:add},svg));
+    // 回路：沉淀 → 反哺新需求（闭环），从轨道末端绕到上方回到起点
+    const p=`M ${END} ${Y} C ${END+60} ${Y} ${END+60} 250 ${END-40} 250 L ${X[0]+40} 250 C ${X[0]-30} 250 ${X[0]-40} ${Y} ${X[0]} ${Y}`;
+    el('path',{d:p,fill:'none',stroke:add,'stroke-width':3,'stroke-dasharray':'1 10','stroke-linecap':'round',opacity:.9},svg);
+    const t=el('text',{x:1140,y:240,'font-size':24,fill:add,'font-weight':550,'text-anchor':'middle','font-family':'MiSans VF'},svg);
+    t.textContent='沉淀的资产反哺新需求 · 全程可溯源';
+    const bg=el('rect',{x:920,y:216,width:440,height:34,fill:css('--ground')},svg); svg.insertBefore(bg,t);
+  }
+}
+track(document.getElementById('trk2'),'now');
+track(document.getElementById('trk3'),'full');
+</script>
+</body>
+</html>
