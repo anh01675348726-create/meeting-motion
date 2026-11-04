@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>面 → 体 · 视角转换 · 液态融合</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#F4F1EA;overflow:hidden}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block;background:#F4F1EA}
+.ctl{position:fixed;left:16px;bottom:12px;font:13px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#8B8C80}
+.ctl button{font:inherit;color:#1E221C;background:transparent;border:1px solid rgba(30,34,28,.25);border-radius:6px;padding:4px 10px;margin-right:6px;cursor:pointer}
+</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><span id="tm"></span></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif';
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80';
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const exo=t=>t>=1?1:1-Math.pow(2,-10*t);
+const sm=t=>t*t*(3-2*t);
+// 欠阻尼弹簧：液体落定时的晃动（全片唯一带回弹的时刻）
+const slosh=(t,w=7.5,z=.32)=>t<=0?0:1-Math.exp(-z*w*t)*(Math.cos(w*Math.sqrt(1-z*z)*t)+z/Math.sqrt(1-z*z)*Math.sin(w*Math.sqrt(1-z*z)*t));
+
+// 纸
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=P;g.fillRect(0,0,1920,1080);
+  let s=5;const R=()=>(s=(s*16807)%2147483647)/2147483647;const n=document.createElement('canvas');n.width=480;n.height=270;const ng=n.getContext('2d');const im=ng.createImageData(480,270);
+  for(let i=0;i<480*270;i++){const v=215+R()*40;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.35;g.drawImage(n,0,0,1920,1080);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  g.strokeStyle='rgba(30,34,28,.045)';g.lineWidth=1;for(let i=40;i<1920;i+=40){g.beginPath();g.moveTo(i+.5,0);g.lineTo(i+.5,1080);g.stroke();}for(let i=40;i<1080;i+=40){g.beginPath();g.moveTo(0,i+.5);g.lineTo(1920,i+.5);g.stroke();}})();
+const PAT=x.createPattern(paper,'no-repeat');
+
+// 世界坐标：x 沿流程（左 → 右），z 纵深（后 → 前），y 向上
+const M=44, NX=150, XW=860, ZD=300;
+const thick=u=>{const rise=sm(clamp(u/.86));const tail=u>.93?sm((1-u)/.07):1;return (12+230*Math.pow(rise,1.5))*tail;};   // u: 0..1
+const COL=j=>{const t=j/(M-1);const a=[246,206,140],b=[214,104,44];return [lerp(a[0],b[0],t)|0,lerp(a[1],b[1],t)|0,lerp(a[2],b[2],t)|0];};
+
+// 相机
+const CX=1080,CY=760,FOC=1600,DIST=2200;
+function project(px,py,pz,yaw,pitch){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const x1=px*cy+pz*sy, z1=-px*sy+pz*cy; const y2=py*cp+z1*sp, z2=-py*sp+z1*cp; const s=FOC/(DIST+z2); return [CX+x1*s, CY-y2*s, z2, s];}
+
+function frame(t){
+  x.drawImage(paper,0,0);
+  const pour=win(t,0,2.4), spread=win(t,1.4,5.2);
+  const unfold=t-5.8;                                 // 面 → 体：每一排按自己的时刻「落」进体里
+  const yaw=lerp(0,-.42,eio(win(t,6.0,10.5)))+lerp(0,.16,eio(win(t,10.5,15.5)));   // 先转过去，再慢慢回一点
+  const pitch=lerp(0,.5,eio(win(t,6.0,10.0)));
+  const swell=win(t,9.5,12);
+  const spreadU=lerp(1,0,eio(spread));
+
+  // 倾泻
+  if(t<6.4){x.save();x.globalAlpha=1-win(t,5.2,6.4);for(let i=0;i<8;i++){const p=eio(pour);const [ex,ey]=project(XW*.86-i*6,thick(.9)*.95,0,0,0);
+      x.strokeStyle='#E57A32';x.lineWidth=2.2;x.beginPath();x.moveTo(1890-i*7,-20);x.bezierCurveTo(1890-i*7,300,ex+40,lerp(-20,ey,.7),ex,lerp(-20,ey,p));x.stroke();}x.restore();}
+
+  // 排序：后 → 前（按投影深度）
+  const rows=[];
+  for(let j=0;j<M;j++){
+    const fz=j/(M-1);
+    const appear=clamp(spread*1.35-(1-fz)*.35);if(appear<=0)continue;
+    const zW=lerp(ZD,-ZD,fz);   // fz=1 在前（近），fz=0 在后（远）
+    const k=slosh(unfold-.9*(1-fz)-.25*Math.abs(fz-.5),6.8,.3);           // 这一排融入体的进度（带晃动）
+    const pts=[],gnd=[];let depth=0;
+    for(let i=0;i<=NX;i++){const u=i/NX;if(u<spreadU-.03)continue;const X=lerp(-XW,XW,u);const th=thick(u);
+      // 面（平面状态）：所有排都在 z=0，按厚度层层叠放（等高排线）
+      const yFlat=th*(1-Math.pow(fz,1.25));
+      // 体：沙丘体量 + 液面长波 + 落定时的一圈晃动（随时间衰减）
+      const zEnv=Math.pow(Math.sin(Math.PI*(fz*.96+.02)),.75);
+      const wave=Math.sin(X/170-t*1.05+fz*3.2)*.55+Math.sin(X/310+t*.55-fz*2.1)*.45;
+      const sloshW=Math.sin(X/120-unfold*4.2+fz*5)*Math.exp(-Math.max(0,unfold-1)*.55)*.22*clamp(unfold);
+      const yVol=th*1.7*zEnv*(1+.14*swell*wave+sloshW);
+      const py=lerp(yFlat,yVol,k), pz=lerp(0,zW,clamp(k));
+      const [sx,sy,sz,s]=project(X,py,pz,yaw,pitch);pts.push([sx,sy]);depth+=sz;
+      const [gx,gy]=project(X,0,pz,yaw,pitch);gnd.push([gx,gy]);}
+    if(pts.length<2)continue;
+    rows.push({j,fz,appear,pts,gnd,depth:depth/pts.length,k});
+  }
+  rows.sort((a,b)=>b.depth-a.depth);
+  for(const r of rows){x.save();x.globalAlpha=r.appear;
+    if(r.k>.02){x.fillStyle=PAT;x.beginPath();r.pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));for(let i=r.gnd.length-1;i>=0;i--)x.lineTo(...r.gnd[i]);x.closePath();x.fill();}
+    const col=COL(r.j);x.strokeStyle=`rgb(${col})`;x.lineWidth=lerp(1,1.7,r.fz);x.lineJoin='round';x.beginPath();r.pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.stroke();x.restore();}
+
+  // 地面发丝线（随视角转动）
+  const g0=project(-XW-60,0,-ZD-40,yaw,pitch),g1=project(XW+60,0,-ZD-40,yaw,pitch);
+  x.strokeStyle='rgba(30,34,28,.28)';x.lineWidth=1;x.beginPath();x.moveTo(g0[0],g0[1]);x.lineTo(g1[0],g1[1]);x.stroke();
+
+  // 字
+  const phase2=t>=5.8;
+  const fin=win(t,12.2,13.4);
+  x.globalAlpha=(phase2?exo(win(t,6.2,7.2)):exo(win(t,.3,1.2)))*(1-eio(win(t,11.8,12.4)));
+  x.fillStyle=MUTE;x.font=`600 22px ${FONT}`;x.letterSpacing='4px';x.fillText(phase2?'体系':'总结 · 沉淀',110,112);x.letterSpacing='0px';
+  x.fillStyle=INK;x.font=`650 64px ${FONT}`;x.fillText(phase2?'面，长成了体。':'做成的方案，沉下来。',108,186);
+  x.font=`400 24px ${FONT}`;x.fillStyle=MUTE;x.fillText(phase2?'一层层沉淀的方案，融成了能托住新问题的体系。':'线一根根沉下来，织成一面：下一个相似的问题，不必从头开始。',112,232);
+  x.globalAlpha=1;
+  if(fin>0){x.globalAlpha=exo(fin);x.fillStyle=MUTE;x.font=`600 22px ${FONT}`;x.letterSpacing='4px';x.fillText('议题三 · 从「工具应用」走向「模式创新」',110,112);x.letterSpacing='0px';x.fillStyle=INK;x.font=`650 84px ${FONT}`;x.fillText('从点，到线，到面，成体系。',106,206);x.globalAlpha=1;}
+}
+let t0=performance.now(),paused=false,pt=0;const T=17;
+function loop(now){if(!paused){pt=(now-t0)/1000;if(pt>T+2.5){t0=now;pt=0;}}frame(Math.min(pt,T));document.getElementById('tm').textContent=pt.toFixed(1)+' s';requestAnimationFrame(loop);}
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;};
+const qt=new URLSearchParams(location.search).get('t');
+if(qt!==null){paused=true;pt=+qt;(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{frame(pt);window.__ready=true;});}else requestAnimationFrame(loop);
+</script></body></html>
