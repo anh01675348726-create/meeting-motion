@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从点，到线，到面，成体系</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#F4F1EA;overflow:hidden}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block;background:#F4F1EA}
+.ctl{position:fixed;left:16px;bottom:10px;font:13px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#8B8C80;display:flex;gap:8px;align-items:center}
+.ctl button{font:inherit;color:#1E221C;background:rgba(244,241,234,.8);border:1px solid rgba(30,34,28,.25);border-radius:6px;padding:4px 10px;cursor:pointer}
+.ctl input{width:320px}
+</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><input id="sk" type="range" min="0" max="80" step="0.1" value="0"><span id="tm"></span></div>
+<script>
+/* ───────────────── 基础 ───────────────── */
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif';
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',BODY='#55574D',GR='#6E7856',GRL='#B3B8A2',OR='#E57A32',OR4='#B4521F',YE='#EDB33B';
+const T_END=80;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const exo=t=>t>=1?1:1-Math.pow(2,-10*t);
+const eo3=t=>1-Math.pow(1-t,3);
+const sm=t=>t*t*(3-2*t);
+const crit=(t,w=8)=>t<=0?0:1-(1+w*t)*Math.exp(-w*t);                 // 临界阻尼：无回弹
+const slosh=(t,w=6.8,z=.3)=>{if(t<=0)return 0;const d=Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(w*d*t)+z/d*Math.sin(w*d*t));}; // 唯一带回弹处
+let SEED=7;const rnd=()=>(SEED=(SEED*16807)%2147483647)/2147483647;
+
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=P;g.fillRect(0,0,1920,1080);
+  const n=document.createElement('canvas');n.width=480;n.height=270;const ng=n.getContext('2d');const im=ng.createImageData(480,270);
+  for(let i=0;i<480*270;i++){const v=215+rnd()*40;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.35;g.drawImage(n,0,0,1920,1080);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  g.strokeStyle='rgba(30,34,28,.045)';g.lineWidth=1;for(let i=40;i<1920;i+=40){g.beginPath();g.moveTo(i+.5,0);g.lineTo(i+.5,1080);g.stroke();}for(let i=40;i<1080;i+=40){g.beginPath();g.moveTo(0,i+.5);g.lineTo(1920,i+.5);g.stroke();}})();
+const PAT=x.createPattern(paper,'no-repeat');
+
+function T(str,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||24}px ${FONT}`;x.fillStyle=o.c||INK;x.textAlign=o.a||'left';x.letterSpacing=(o.ls||0)+'px';x.globalAlpha*=(o.op??1);x.fillText(str,X,Y);x.restore();}
+// 文字块：从左往右擦出、从左往右擦掉（不是淡入，也不是飞入）
+function block(tIn,tOut,draw,{x0=100,x1=1900,y0=60,y1=1080}={}){const t=NOW;if(t<tIn||t>tOut+.8)return;
+  const a=exo(win(t,tIn,tIn+1.1)),b=eio(win(t,tOut,tOut+.7));x.save();x.beginPath();x.rect(lerp(x0,x1,b),y0,(x1-x0)*a-(x1-x0)*b+ (b>0?0:0),y1-y0);x.clip();draw();x.restore();}
+function head(eb,h,sub,tIn,tOut){block(tIn,tOut,()=>{T(eb,110,112,{s:22,w:600,c:MUTE,ls:4});T(h,108,186,{s:64,w:650,ls:-1.5});if(sub)T(sub,112,232,{s:24,c:MUTE});},{y1:260});}
+function poly(pts,frac=1){const n=Math.max(0,Math.min(pts.length-1,frac*(pts.length-1)));const k=Math.floor(n);if(n<=0)return;x.beginPath();x.moveTo(...pts[0]);
+  for(let i=1;i<=k;i++)x.lineTo(...pts[i]);if(k<pts.length-1){const f=n-k;x.lineTo(lerp(pts[k][0],pts[k+1][0],f),lerp(pts[k][1],pts[k+1][1],f));}x.stroke();}
+function bez(p0,p1,p2,p3,n=40){const r=[];for(let i=0;i<=n;i++){const t=i/n,u=1-t;r.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}return r;}
+
+/* ───────────────── 共用几何：轴 + 40 根线 ───────────────── */
+const STG=[['员工提出',170],['团队长审核',560],['部门评估',960],['开发',1180],['上线',1400],['推广',1620],['效果',1840]];
+const ACT=['方案 · 资源','跟踪上线','推广使用','验证效果'];
+const AY=330,N=40,Y0=430,GAP=9;
+const LINES=[...Array(N)].map((_,i)=>{const y=Y0+i*GAP,pass=i<8;
+  if(pass){const ty=578+i*6;return {i,pass,y,ty,main:[[170,y],[560,y]],tail:bez([560,y],[740,y],[760,ty],[960,ty])};}
+  const k=i-8,ey=760+k*11,ex=1150+k*14;return {i,pass,y,main:[[170,y],[560,y]],tail:bez([560,y],[700,y],[760+k*4,ey-80],[ex,ey+60])};});
+function drawAxis(prog,mix,alpha=1){if(prog<=0)return;x.save();x.globalAlpha*=alpha;const xe=lerp(170,1840,eio(prog));
+  x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(170,AY);x.lineTo(xe,AY);x.stroke();
+  STG.forEach(([n,X],i)=>{if(X>xe+1)return;const on=i<3||mix(i)>.5;const a=X>1800?'right':'center';const pop=crit(NOW-(AXT0+(X-170)/1670*1.4),9);
+    x.fillStyle=on?YE:P;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(X,AY,8*pop,0,7);x.fill();x.stroke();
+    T(n,X,AY-30,{s:24,w:on?650:450,a,c:on?INK:MUTE});
+    if(i>=3){const m=mix(i);if(m<1)T('无记录',X,AY+36,{s:19,c:OR4,a,op:1-m});if(m>0)T(ACT[i-3],X,AY+36,{s:19,c:OR4,a,w:600,op:m});}});x.restore();}
+let AXT0=14;
+
+/* ───────────────── 段 1–2：点 ───────────────── */
+const FC=50,FR=30,FX=760,FY=330,FG=21;
+const DOTS=[...Array(FC*FR)].map((_,n)=>{const c=n%FC,r=(n/FC)|0;return {x:FX+c*FG,y:FY+r*FG,c,r};});
+const ACTIVE=new Set();while(ACTIVE.size<200)ACTIVE.add((rnd()*1500)|0);
+// 800 个「点状需求」：散落在工具点阵之间，随后被流程吸成 40 根线
+const NEEDS=[...Array(800)].map((_,n)=>{const row=n%40;return {x:760+rnd()*1040,y:300+rnd()*660,row,delay:rnd()*2.6+(n/800)*.8};});
+
+function scenePoints(t){
+  // 工具点阵（1500）：一列列被点亮，墨点＝日活在用
+  const toolsA=1-eio(win(t,7.2,8.6))*.78; if(t>14.5)return;
+  x.save();x.globalAlpha=toolsA*(1-win(t,13,14.5));
+  for(const d of DOTS){const lit=ACTIVE.has(d.c+d.r*FC)&&t>.4+d.c/FC*2.6;x.fillStyle=lit?INK:'rgba(110,120,86,.38)';const r=lit?3.6*crit(t-.4-d.c/FC*2.6,10)+0:2.6;
+    x.beginPath();x.arc(d.x,d.y,Math.max(2.6,r),0,7);x.fill();}
+  x.restore();
+  head('现状 · 我们有什么','1500+ 个智能工具','一个点 = 一个工具。墨色实心的点，是每天有人在用的。',.2,6.6);
+  block(1.6,6.6,()=>{T('日活 200+',110,430,{s:72,w:250,ls:-2});T('其余多数只在一个场景里用过',112,472,{s:24,c:BODY});T('难复制、难推广，与主流程脱节。',112,506,{s:24,c:BODY});},{y1:540});
+  block(2.8,6.6,()=>{T('1000+',110,650,{s:72,w:250,ls:-2});T('名经总部数科认证的数字化专才',112,692,{s:24,c:BODY});T('人均一个工具。',112,726,{s:24,c:BODY});},{y0:560,y1:760});
+  // 需求点：浮现 → 被吸进各自的轨道
+  if(t>7){const headX=lerp(170,560,eio(win(t,9.4,13.6)));
+    for(const n of NEEDS){const show=crit(t-7.2-n.delay*.35,7);if(show<=0)continue;
+      const go=eio(win(t,9.4+n.delay,10.9+n.delay));if(go>=1)continue;const ty=Y0+n.row*GAP;
+      const px=lerp(n.x,headX,go),py=lerp(n.y,ty,go);const vx=(headX-n.x),vy=(ty-n.y);const sp=go>0&&go<1?Math.sin(Math.PI*go):0;
+      const ang=Math.atan2(vy,vx),len=2.6+sp*9;x.fillStyle=n.row<8?OR:(go>0?GR:INK);x.globalAlpha=show*(go>0?1:.85);
+      x.beginPath();x.ellipse(px,py,len,2.4,ang,0,7);x.fill();x.globalAlpha=1;}
+    for(const L of LINES){x.strokeStyle=L.pass?OR:GR;x.globalAlpha=L.pass?1:.72;x.lineWidth=L.pass?2.2:1.3;x.beginPath();x.moveTo(170,L.y);x.lineTo(headX,L.y);x.stroke();
+      if(headX>175){x.fillStyle=x.strokeStyle;x.beginPath();x.ellipse(headX,L.y,4.5*(1-win(t,13.4,14)),L.pass?2.2:1.6,0,0,7);x.fill();}}
+    x.globalAlpha=1;
+    head('需求也是一个个点','800+ 条业务需求，多是「点状」的','说不清普遍痛点、发生频率、影响程度、优化效益。进了流程，才汇成线：一根线 = 20 条需求。',7.6,13.4);}
+}
+
+/* ───────────────── 段 3–5、7：流向图 ───────────────── */
+function sceneFlow(t){
+  if(t<13.6||t>66)return;
+  const fade=1-eio(win(t,62.2,64.2));
+  const pan=-1920*eio(win(t,42,43.6))+1920*eio(win(t,52.8,54.4));
+  x.save();x.globalAlpha=fade;x.translate(pan,-eio(win(t,62,64.4))*520);
+  AXT0=14.2;
+  const repairX=lerp(960,1840,eio(win(t,55.2,60.4)));
+  drawAxis(win(t,14.2,15.8),i=>clamp((repairX-STG[i][1]+20)/80),1);
+  const split=eio(win(t,15.6,19.4)), rejA=lerp(1,.22,eio(win(t,33.6,35.6))), rejGo=eio(win(t,17.4,21.4));
+  for(let k=N-1;k>=0;k--){const L=LINES[k];x.strokeStyle=L.pass?OR:GR;x.lineWidth=L.pass?2.2:1.3;x.globalAlpha=fade*(L.pass?1:.72*rejA);
+    x.beginPath();x.moveTo(170,L.y);x.lineTo(560,L.y);x.stroke();
+    if(L.pass)poly(L.tail,split);else{poly(L.tail,rejGo*.94);}
+    if(L.pass&&repairX>962){x.beginPath();x.moveTo(960,L.ty);x.lineTo(repairX,L.ty);x.stroke();}}
+  x.globalAlpha=fade;
+  // 评估之后：断成越来越小的点（修复时从左被吃掉）
+  const brk=win(t,19.6,22.8);
+  if(brk>0)for(let i=0;i<8;i++){const y=578+i*6;for(let X=968;X<1860;X+=14){if(X<repairX+18)continue;const f=(X-968)/900;if(f>brk*1.05)continue;
+    x.globalAlpha=fade*Math.max(0,1-f);x.fillStyle=OR;x.beginPath();x.arc(X,y,1.4*(1-f*.6),0,7);x.fill();}}
+  x.globalAlpha=fade;
+  // 修复：线头是一颗正在吞并点的「液珠」
+  if(t>55.2&&t<60.8){const b=1-win(t,60.2,60.8);x.fillStyle=OR;x.beginPath();x.ellipse(repairX+6,599,16*b,26*b,0,0,7);x.fill();
+    for(let k=0;k<5;k++){const X=repairX+30+k*(18+k*4);x.beginPath();x.arc(X,599+Math.sin(k*1.7+t*3)*5,Math.max(1.5,(9-k*1.6))*b,0,7);x.fill();}}
+  // 注记
+  block(16,25.4,()=>{T('800+',150,412,{s:54,w:250,ls:-2});T('40 根线',290,410,{s:20,c:MUTE});},{y0:360,y1:420,x1:700});
+  block(18.6,25.4,()=>{T('评审通过 20%',980,532,{s:20,c:MUTE});T('约 160 · 8 根',980,560,{s:30,w:450,c:OR4});},{x0:970,y0:500,y1:570});
+  block(20.6,25.4,()=>{T('约 640 · 32 根',1300,1000,{s:30,w:350,c:GR});T('未通过——背后的问题，没有被记录',1300,1036,{s:20,c:MUTE});},{x0:1290,y0:960,y1:1050});
+  block(22.4,25.8,()=>{T('评估之后，线就断成了点。',1180,720,{s:36,w:650});T('开发了没有、上线了没有、效果如何，都没有数字。',1182,764,{s:22,c:BODY});},{x0:1170,y0:680,y1:780});
+  // 3+1：责任括线 + 铅垂线
+  const br=eio(win(t,36.8,39.6)),brOut=1-eio(win(t,41.4,42.6))*0;
+  if(t>36.6&&t<54){x.globalAlpha=fade*(1-eio(win(t,52.6,53.6)));x.strokeStyle=INK;x.lineWidth=1.4;x.beginPath();x.moveTo(170,268);x.lineTo(170,258);x.lineTo(lerp(170,1840,br),258);if(br>=1)x.lineTo(1840,268);x.stroke();
+    if(br>.6)T('责任范围：从需求发生，一路到效果',1005,246,{s:22,w:600,a:'center',op:win(br,.6,1)});x.globalAlpha=fade;}
+  if(t>35.4&&t<54){x.globalAlpha=fade*(1-eio(win(t,52.6,53.6)));[[300,INK],[360,INK],[420,INK],[500,OR]].forEach(([X,col],k)=>{const d=crit(t-35.6-k*.16,9);const yy=lerp(150,342,d);
+      x.strokeStyle=col;x.lineWidth=1.6;x.beginPath();x.moveTo(X,yy);x.lineTo(X,yy+78);x.stroke();x.fillStyle=col;x.beginPath();x.arc(X,yy,7,0,7);x.fill();});x.globalAlpha=fade;}
+  x.restore();
+}
+
+/* ───────────────── 段 4：断点特写（推进）+ 唯一静止 ───────────────── */
+function zoomFor(t){const zin=eio(win(t,25.8,28.4)),zout=eio(win(t,33.4,35.2));return lerp(1,2.7,zin*(1-zout));}
+function sceneBreakText(t){
+  block(28.6,33.2,()=>{T('审批只回答「做不做」，',110,820,{s:66,w:650,ls:-1.5});T('没有人对「做成没有」负责。',110,912,{s:66,w:650,ls:-1.5});},{y0:740,y1:940});
+}
+// 特写下线头的液滴：在放大坐标系里画，越往右越小，正在脱落
+function breakDroplets(t){const a=win(t,26.6,28.4)*(1-win(t,33.2,34.4));if(a<=0)return;x.save();x.globalAlpha=a;x.fillStyle=OR;
+  for(let i=0;i<8;i++){const y=578+i*6;const neck=.5+.5*Math.sin(t*1.6+i);x.beginPath();x.ellipse(966,y,5.5,1.9+neck*.5,0,0,7);x.fill();
+    for(let k=0;k<9;k++){const X=980+k*(11+k*2.4)+(t<30||t>33?(t-26.6)*2*(k+1):0);x.beginPath();x.arc(X,y+Math.sin(k*1.3+i)*k*.3,Math.max(.5,2.4-k*.24),0,7);x.fill();}}x.restore();}
+
+/* ───────────────── 段 6：同一个根因，改多深 ───────────────── */
+const DP=[[-120,-70],[-40,-140],[80,-110],[140,10],[60,120],[-80,110],[-150,20]];
+function sceneDepth(t){if(t<42||t>55)return;const panIn=eio(win(t,42,43.6)),panOut=eio(win(t,52.8,54.4));const off=lerp(1920,0,panIn)-1920*panOut;
+  x.save();x.translate(off,0);
+  T('评审 · 先归因',110,112,{s:22,w:600,c:MUTE,ls:4});T('同一个根因，改多深？',108,186,{s:64,w:650,ls:-1.5});
+  T('以前只有「过 / 不过」，过了基本就是一个点。现在按根因选深度：点、线、面。',112,232,{s:24,c:MUTE});
+  x.strokeStyle='rgba(30,34,28,.3)';x.lineWidth=1;const ar=eio(win(t,43.4,45.4));x.beginPath();x.moveTo(180,300);x.lineTo(lerp(180,1760,ar),300);x.stroke();
+  if(ar>.95){x.beginPath();x.moveTo(1748,293);x.lineTo(1762,300);x.lineTo(1748,307);x.stroke();T('改动深度',1760,284,{s:20,c:MUTE,a:'right'});}
+  ['不做','单点优化','全链路优化','流程重塑'].forEach((n,k)=>{const cx=330+k*420,cy=560;const st=44.6+k*1.55,p=crit(t-st,6);
+    const grow=eio(win(t,43.6+k*.15,45.2+k*.15));
+    if(k===3&&t>st){ // 面：等高排线一圈圈从根因向外漫开（液体），落定时轻晃
+      const sp=slosh(t-st,6,.34);for(let r=0;r<16;r++){const rr=(14+r*9.5)*sp;if(rr<2)continue;x.strokeStyle=`rgba(${lerp(214,246,r/15)|0},${lerp(104,206,r/15)|0},${lerp(44,140,r/15)|0},.95)`;x.lineWidth=1.2;
+        x.beginPath();for(let a=0;a<=64;a++){const th=a/64*Math.PI*2;const w=1+.16*Math.sin(th*3+r*.4+t*.8)+.08*Math.sin(th*5-t);const X=cx+Math.cos(th)*rr*w*1.18,Y=cy+Math.sin(th)*rr*w;a?x.lineTo(X,Y):x.moveTo(X,Y);}x.closePath();x.stroke();}}
+    DP.forEach(([a,b],i)=>{x.strokeStyle=k===0&&p>0?'rgba(139,140,128,.5)':'rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(cx,cy);const qx=cx+a/2+(i%2?14:-14),qy=cy+b/2;
+      const pts=bez([cx,cy],[qx,qy],[qx,qy],[cx+a,cy+b],12);poly(pts,grow);});
+    if(k===2){x.strokeStyle=OR;x.lineWidth=4;x.lineCap='round';const ch=[0,1,2,3,4].map(i=>[cx+DP[i][0],cy+DP[i][1]]);poly(ch,eio(win(t,st,st+1.2)));x.lineCap='butt';}
+    DP.forEach(([a,b],i)=>{let col=GR,r=7;if(k===0)col=p>0?GRL:GR;if(k===1&&i===2){col=OR;r=lerp(7,15,p);}if(k===2&&i<5&&t>st+i*.24)col=OR;if(k===3&&p>0)col=OR4;
+      x.fillStyle=col;x.beginPath();x.arc(cx+a,cy+b,r*grow,0,7);x.fill();});
+    x.fillStyle=P;x.strokeStyle=k===0&&p>0?MUTE:INK;x.lineWidth=2;x.fillRect(cx-9,cy-9,18,18);x.strokeRect(cx-9,cy-9,18,18);
+    if(k===0&&p>0){x.strokeStyle=MUTE;x.lineWidth=1.5;x.beginPath();x.moveTo(cx-30,cy+30);x.lineTo(lerp(cx-30,cx+30,p),lerp(cy+30,cy-30,p));x.stroke();}
+    T(n,cx-150,800,{s:38,w:650,c:k===0?MUTE:INK,op:grow});T(['判断后不投入','· 点','· 线','· 面'][k],cx-148,840,{s:24,w:600,c:k===0?MUTE:OR4,op:p});});
+  x.restore();}
+
+/* ───────────────── 段 8：沉淀 → 面 → 体（视角转动、液态融合） ───────────────── */
+const VM=44,VNX=150,XW=860,ZD=300;
+const thick=u=>{const rise=sm(clamp(u/.86));const tail=u>.93?sm((1-u)/.07):1;return (12+230*Math.pow(rise,1.5))*tail;};
+const VCOL=j=>{const t=j/(VM-1);const a=[246,206,140],b=[214,104,44];return [lerp(a[0],b[0],t)|0,lerp(a[1],b[1],t)|0,lerp(a[2],b[2],t)|0];};
+const CX=1080,CY=760,FOC=1600,DIST=2200;
+function project(px,py,pz,yaw,pitch){const cy=Math.cos(yaw),sy=Math.sin(yaw),cp=Math.cos(pitch),sp=Math.sin(pitch);
+  const x1=px*cy+pz*sy,z1=-px*sy+pz*cy;const y2=py*cp+z1*sp,z2=-py*sp+z1*cp;const s=FOC/(DIST+z2);return [CX+x1*s,CY-y2*s,z2,s];}
+function sceneVolume(t){const v=t-62;if(v<0)return;
+  const pour=win(v,0,2.4),spread=win(v,1.4,5.2),unfold=v-5.8;
+  const yaw=lerp(0,-.42,eio(win(v,6,10.5)))+lerp(0,.16,eio(win(v,10.5,15.5))),pitch=lerp(0,.5,eio(win(v,6,10))),swell=win(v,9.5,12);const spreadU=lerp(1,0,eio(spread));
+  if(v<6.4){x.save();x.globalAlpha=1-win(v,5.2,6.4);for(let i=0;i<8;i++){const p=eio(pour);const [ex,ey]=project(XW*.86-i*6,thick(.9)*.95,0,0,0);
+      x.strokeStyle=OR;x.lineWidth=2.2;x.beginPath();x.moveTo(1890-i*7,-20);x.bezierCurveTo(1890-i*7,300,ex+40,lerp(-20,ey,.7),ex,lerp(-20,ey,p));x.stroke();}x.restore();}
+  const rows=[];
+  for(let j=0;j<VM;j++){const fz=j/(VM-1);const appear=clamp(spread*1.35-(1-fz)*.35);if(appear<=0)continue;const zW=lerp(ZD,-ZD,fz);
+    const k=slosh(unfold-.9*(1-fz)-.25*Math.abs(fz-.5),6.8,.3);const pts=[],gnd=[];let depth=0;
+    for(let i=0;i<=VNX;i++){const u=i/VNX;if(u<spreadU-.03)continue;const X=lerp(-XW,XW,u);const th=thick(u);
+      const yFlat=th*(1-Math.pow(fz,1.25));const zEnv=Math.pow(Math.sin(Math.PI*(fz*.96+.02)),.75);
+      const wave=Math.sin(X/170-v*1.05+fz*3.2)*.55+Math.sin(X/310+v*.55-fz*2.1)*.45;
+      const sw=Math.sin(X/120-unfold*4.2+fz*5)*Math.exp(-Math.max(0,unfold-1)*.55)*.22*clamp(unfold);
+      const yVol=th*1.7*zEnv*(1+.14*swell*wave+sw);const py=lerp(yFlat,yVol,k),pz=lerp(0,zW,clamp(k));
+      const [sx,sy,sz]=project(X,py,pz,yaw,pitch);pts.push([sx,sy]);depth+=sz;const [gx,gy]=project(X,0,pz,yaw,pitch);gnd.push([gx,gy]);}
+    if(pts.length<2)continue;rows.push({j,fz,appear,pts,gnd,depth:depth/pts.length,k});}
+  rows.sort((a,b)=>b.depth-a.depth);
+  for(const r of rows){x.save();x.globalAlpha=r.appear;
+    if(r.k>.02){x.fillStyle=PAT;x.beginPath();r.pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));for(let i=r.gnd.length-1;i>=0;i--)x.lineTo(...r.gnd[i]);x.closePath();x.fill();}
+    x.strokeStyle=`rgb(${VCOL(r.j)})`;x.lineWidth=lerp(1,1.7,r.fz);x.lineJoin='round';x.beginPath();r.pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.stroke();x.restore();}
+  const g0=project(-XW-60,0,-ZD-40,yaw,pitch),g1=project(XW+60,0,-ZD-40,yaw,pitch);x.strokeStyle='rgba(30,34,28,.28)';x.lineWidth=1;x.beginPath();x.moveTo(g0[0],g0[1]);x.lineTo(g1[0],g1[1]);x.stroke();
+  head('总结 · 沉淀','做成的方案，沉下来。','线一根根沉下来，织成一面：下一个相似的问题，不必从头开始。',62.4,67.6);
+  head('体系','面，长成了体。','一层层沉淀的方案，融成了能托住新问题的体系。',68.2,73.6);
+  block(74.2,999,()=>{T('议题三 · 从「工具应用」走向「模式创新」',110,112,{s:22,w:600,c:MUTE,ls:4});T('从点，到线，到面，成体系。',106,206,{s:84,w:650,ls:-1.5});},{y1:240});
+}
+
+/* ───────────────── 主时间线 ───────────────── */
+let NOW=0;
+function frame(t){NOW=t;x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.drawImage(paper,0,0);
+  // 页脚数据来源（1–26s）
+  if(t<26){x.globalAlpha=win(t,1,2)*(1-win(t,25,26));T('数据：1500+ 智能工具、日活 200+、1000+ 认证数字化专才、800+ 业务需求、评审通过率 20%；160 / 640 按比例估算。',110,1040,{s:18,c:MUTE});x.globalAlpha=1;}
+  scenePoints(t);
+  // 流向图 + 断点特写的推镜（以断点为中心放大）
+  const z=zoomFor(t);x.save();x.translate(966,598);x.scale(z,z);x.translate(-966,-598);sceneFlow(t);breakDroplets(t);x.restore();
+  if(t>13.6&&t<34.2){x.save();x.globalAlpha=1-win(t,25.8,26.6)*1+win(t,33.6,34.2);head('需求的去向','800 多条需求，去了哪里？','每一根线 = 20 条需求',14,25.6);x.restore();}
+  sceneBreakText(t);
+  head('接下来 · 先有人，再有路','3 + 1，从头负责到效果','',35.4,41.8);
+  block(37.4,41.6,()=>{x.fillStyle='rgba(244,241,234,.92)';x.fillRect(100,790,1040,200);
+    T('前线 3 人',110,830,{s:30,w:650});T('把一线反馈理成问题，判断值不值得做、怎么做，明确方案。',112,868,{s:22,c:BODY});
+    T('职能 1 人',110,930,{s:30,w:650,c:OR4});T('业管 · 综管 · 财企：审核需求，为它争取资源。',112,968,{s:22,c:BODY});
+    T('4 个人，对同一个结果负责。',1180,720,{s:36,w:650});},{y0:680,y1:1000});
+  sceneDepth(t);
+  head('评估之后','这一次，线没有断。','方案和落地计划先定下来，资源同步争取；每一段都有人跟、有数字。',54.6,61.4);
+  block(57,61.4,()=>{T('断开的点，重新融成了线。',1180,720,{s:36,w:650});T('开发 · 上线 · 推广 · 效果：每一段都有记录。',1182,764,{s:22,c:BODY});},{x0:1170,y0:680,y1:780});
+  sceneVolume(t);
+}
+
+/* ───────────────── 播放 ───────────────── */
+let t0=performance.now(),paused=false,pt=0;const sk=document.getElementById('sk');
+function loop(now){if(!paused){pt=(now-t0)/1000;if(pt>T_END+3){t0=now;pt=0;}sk.value=Math.min(pt,T_END);}frame(Math.min(pt,T_END));document.getElementById('tm').textContent=Math.min(pt,T_END).toFixed(1)+' / '+T_END+' s';requestAnimationFrame(loop);}
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;paused=false;document.getElementById('pp').textContent='暂停';};
+sk.oninput=()=>{pt=+sk.value;t0=performance.now()-pt*1000;};
+const qt=new URLSearchParams(location.search).get('t');
+if(qt!==null){paused=true;pt=+qt;(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{frame(pt);window.__ready=true;});}
+else (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{t0=performance.now();requestAnimationFrame(loop);});
+window.render=frame;
+</script></body></html>
