@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>面的材质 · 三选一</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#F4F1EA}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+(async()=>{
+await document.fonts.load('600 80px "MiSans VF"','做成的方案沉下来下一个相似问题不必从头开始供给留下经验让前线把提得更准总结淀员工提出团队长审核部门评估开发上线推广效果资源跟踪使用验证面铺在整个流程底下接住新需求水彩晕染排线织半调网点ABC·');
+const M=new URLSearchParams(location.search).get('m')||'A';
+const c=document.getElementById('c'),x=c.getContext('2d');
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',GR='#6E7856',OR='#E57A32',YE='#EDB33B',OR4='#B4521F';
+let sd=11;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const gauss=()=>{let u=0;for(let i=0;i<6;i++)u+=R();return (u-3)/1.5;};
+const F=(w,s)=>`${w} ${s}px "MiSans VF"`;
+function T(t,X,Y,o={}){x.save();x.font=F(o.w||400,o.s||24);x.fillStyle=o.c||INK;x.textAlign=o.a||'left';if(o.ls)x.letterSpacing=o.ls+'px';x.fillText(t,X,Y);x.restore();}
+function noise(w,h,lo){const n=document.createElement('canvas');n.width=w;n.height=h;const g=n.getContext('2d');const im=g.createImageData(w,h);for(let i=0;i<w*h;i++){const v=lo+R()*(255-lo);im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}g.putImageData(im,0,0);return n;}
+x.fillStyle=P;x.fillRect(0,0,1920,1080);x.save();x.globalCompositeOperation='multiply';[[48,27,.22,228],[1920,1080,.30,212]].forEach(([w,h,a,lo])=>{x.globalAlpha=a;x.drawImage(noise(w,h,lo),0,0,1920,1080)});x.restore();
+x.strokeStyle='rgba(30,34,28,.045)';x.lineWidth=1;for(let i=40;i<1920;i+=40){x.beginPath();x.moveTo(i+.5,0);x.lineTo(i+.5,1080);x.stroke();}for(let i=40;i<1080;i+=40){x.beginPath();x.moveTo(0,i+.5);x.lineTo(1920,i+.5);x.stroke();}
+
+// 轴 + 线（与前后镜头同一几何）
+const STG=[['员工提出',170],['团队长审核',560],['部门评估',960],['开发',1180],['上线',1400],['推广',1620],['效果',1840]];
+const AY=300;x.strokeStyle='rgba(30,34,28,.35)';x.beginPath();x.moveTo(170,AY);x.lineTo(1840,AY);x.stroke();
+STG.forEach(([n,X],i)=>{const a=X>1800?'right':'center';x.fillStyle=YE;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(X,AY,8,0,7);x.fill();x.stroke();T(n,X,AY-28,{s:24,w:650,a});
+  if(i>=3)T(['方案 · 资源','跟踪上线','推广使用','验证效果'][i-3],X,AY+34,{s:19,w:600,c:OR4,a});});
+const Y0=400,GAP=9;
+for(let i=39;i>=0;i--){const y=Y0+i*GAP,pass=i<8;x.lineWidth=pass?2.2:1.2;x.strokeStyle=pass?OR:GR;x.globalAlpha=pass?1:.22;
+  x.beginPath();x.moveTo(170,y);x.lineTo(560,y);x.stroke();
+  if(pass){const ty=520+i*6;x.beginPath();x.moveTo(560,y);x.bezierCurveTo(740,y,760,ty,960,ty);x.lineTo(1780,ty);
+    // 在终点向下倾泻
+    x.bezierCurveTo(1830+i*3,ty,1840+i*2,760,1790-i*7,846);x.stroke();}
+  else{const k=i-8,ey=700+k*6,ex=1000+k*10;x.beginPath();x.moveTo(560,y);x.bezierCurveTo(700,y,740,ey-60,ex,ey);x.stroke();}}
+x.globalAlpha=1;
+
+// 面：一块沉积体 —— 右边（倾泻处）最厚，往左慢慢变薄，两头收尖；三层沉淀
+const xL=150,xR=1880,BASE=1036,HMAX=196;
+const sm=t=>t*t*(3-2*t);
+function thick(X){const t=(X-xL)/(xR-xL);const rise=sm(Math.min(1,t/.86));const tail=t>.9?sm((1-t)/.1):1;return (16+HMAX*Math.pow(rise,1.6))*tail;}
+function topY(X,k){const h=thick(X);const f=[1,.62,.3][k];return BASE-h*f+Math.sin(X/83+k*2)*3*f+Math.sin(X/27+k)*1.2;}
+const COLS=[[247,212,158],[239,164,92],[222,112,50]];
+function band(g,k,j=0){g.beginPath();for(let X=xL;X<=xR;X+=8){const y=topY(X,k)+gauss()*j;X===xL?g.moveTo(X,y):g.lineTo(X,y);}
+  for(let X=xR;X>=xL;X-=8)g.lineTo(X,BASE+Math.min(0,-0)+ (k<2?0:0));g.closePath();}
+const rgba=(c,a)=>`rgba(${c[0]},${c[1]},${c[2]},${a})`;
+// 地平线（发丝）
+x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(110,BASE+.5);x.lineTo(1890,BASE+.5);x.stroke();
+
+if(M==='A'){ // 水彩：一层层罩染，透明、边缘积色、轻颗粒，留出纸白
+  [0,1,2].forEach(k=>{const o=document.createElement('canvas');o.width=1920;o.height=1080;const g=o.getContext('2d');
+    for(let n=0;n<26;n++){g.fillStyle=rgba(COLS[k],.05);band(g,k,2.6);g.fill();}
+    g.save();g.filter='blur(1.6px)';g.strokeStyle=rgba(COLS[k].map(v=>v*.86),.6);g.lineWidth=2.6;g.beginPath();for(let X=xL;X<=xR;X+=8){const y=topY(X,k);X===xL?g.moveTo(X,y):g.lineTo(X,y);}g.stroke();g.restore();
+    // 水痕：几处颜料被水推开的浅斑
+    g.globalCompositeOperation='destination-out';for(let n=0;n<7;n++){const X=xL+200+R()*1400,Y=topY(X,k)+thick(X)*.2*(1+R());const rg=g.createRadialGradient(X,Y,0,X,Y,40+R()*60);rg.addColorStop(0,'rgba(0,0,0,.35)');rg.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=rg;g.fillRect(X-120,Y-120,240,240);}
+    g.globalCompositeOperation='source-atop';g.globalAlpha=.12;g.drawImage(noise(960,540,190),0,0,1920,1080);
+    x.drawImage(o,0,0);});
+}
+if(M==='B'){ // 排线：等高线一样的线，跟着地形走，越往下越密；左端收拢，像米纳德的线汇在一起
+  [0,1,2].forEach(k=>{const sp=[9,6.5,4.6][k];x.save();band(x,k,0);x.clip();x.strokeStyle=rgba(COLS[k].map(v=>v*.92),1);x.lineWidth=[1,1.1,1.25][k];
+    for(let d=0;d<HMAX+20;d+=sp){x.beginPath();for(let X=xL;X<=xR;X+=8){const y=topY(X,k)+d*(thick(X)/HMAX);X===xL?x.moveTo(X,y):x.lineTo(X,y);}x.stroke();}
+    x.restore();
+    x.strokeStyle=rgba(COLS[k].map(v=>v*.78),1);x.lineWidth=1.6;x.beginPath();for(let X=xL;X<=xR;X+=8){const y=topY(X,k);X===xL?x.moveTo(X,y):x.lineTo(X,y);}x.stroke();});
+}
+if(M==='C'){ // 半调：孔版网点，点越大越浓；网格旋转 15°
+  const cell=10,ang=.26,ca=Math.cos(ang),sa=Math.sin(ang);
+  [0,1,2].forEach(k=>{x.save();band(x,k,0);x.clip();x.fillStyle=rgba(COLS[k],1);
+    for(let u=-300;u<2300;u+=cell)for(let v=500;v<1300;v+=cell){const X=u*ca-v*sa+300,Y=u*sa+v*ca-200;if(Y<700||Y>BASE||X<xL||X>xR)continue;
+      const depth=Math.min(1,(Y-topY(X,k))/Math.max(20,thick(X)*.5));const r=cell*.52*Math.sqrt(Math.max(.04,.18+.75*depth));x.beginPath();x.arc(X,Y,r,0,7);x.fill();}
+    x.restore();});
+  x.save();x.globalCompositeOperation='multiply';x.globalAlpha=.18;x.drawImage(noise(960,540,180),0,0,1920,1080);x.restore();
+}
+// 新需求落在面上 —— 被接住
+x.fillStyle=INK;[[300,1006],[480,1000],[660,994]].forEach(([X,Y])=>{x.beginPath();x.arc(X,Y,4,0,7);x.fill();});
+T('新的需求，落在已经沉下来的面上',300,976,{s:20,c:'#55574D'});
+
+T('总结 · 沉淀',110,112,{s:22,w:600,c:MUTE,ls:4});T('做成的方案，沉下来。',108,186,{s:64,w:650,ls:-1.5});
+T('面，铺在整个流程的底下：下一个相似的问题，不必从头开始。',112,232,{s:24,c:MUTE});
+T({A:'A · 水彩晕染',B:'B · 排线织面',C:'C · 半调网点'}[M],1810,140,{s:24,w:650,a:'right',c:OR4});
+window.__ready=true;
+})();
+</script></body></html>
