@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>从点，到线，到面，成体系 · v3</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#F4F1EA;overflow:hidden}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block;background:#F4F1EA}
+.ctl{position:fixed;left:16px;bottom:10px;font:13px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#8B8C80;display:flex;gap:8px;align-items:center}
+.ctl button{font:inherit;color:#1E221C;background:rgba(244,241,234,.8);border:1px solid rgba(30,34,28,.25);border-radius:6px;padding:4px 10px;cursor:pointer}
+.ctl input{width:320px}
+</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><button id="fs">全屏 (F)</button><input id="sk" type="range" min="0" max="88" step="0.1" value="0"><span id="tm"></span></div>
+<script>
+/* ───────────────── 基础 ───────────────── */
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif';
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',BODY='#55574D',GR='#6E7856',GRL='#B3B8A2',OR='#E57A32',OR4='#B4521F',YE='#EDB33B';
+const T_END=88;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const exo=t=>t>=1?1:1-Math.pow(2,-10*t);
+const eo3=t=>1-Math.pow(1-t,3);
+const sm=t=>t*t*(3-2*t);
+const crit=(t,w=8)=>t<=0?0:1-(1+w*t)*Math.exp(-w*t);                 // 临界阻尼：无回弹
+const slosh=(t,w=6.8,z=.3)=>{if(t<=0)return 0;const d=Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(w*d*t)+z/d*Math.sin(w*d*t));}; // 唯一带回弹处
+let SEED=7;const rnd=()=>(SEED=(SEED*16807)%2147483647)/2147483647;
+
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=P;g.fillRect(0,0,1920,1080);
+  const n=document.createElement('canvas');n.width=480;n.height=270;const ng=n.getContext('2d');const im=ng.createImageData(480,270);
+  for(let i=0;i<480*270;i++){const v=215+rnd()*40;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.16;g.drawImage(n,0,0,1920,1080);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  g.strokeStyle='rgba(30,34,28,.045)';g.lineWidth=1;for(let i=40;i<1920;i+=40){g.beginPath();g.moveTo(i+.5,0);g.lineTo(i+.5,1080);g.stroke();}for(let i=40;i<1080;i+=40){g.beginPath();g.moveTo(0,i+.5);g.lineTo(1920,i+.5);g.stroke();}})();
+const PAT=x.createPattern(paper,'no-repeat');
+
+function T(str,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||24}px ${FONT}`;x.fillStyle=o.c||INK;x.textAlign=o.a||'left';x.letterSpacing=(o.ls||0)+'px';x.globalAlpha*=(o.op??1);x.fillText(str,X,Y);x.restore();}
+// 文字块：从左往右擦出、从左往右擦掉（不是淡入，也不是飞入）
+function block(tIn,tOut,draw,{x0=100,x1=1900,y0=60,y1=1080}={}){const t=NOW;if(t<tIn||t>tOut+.8)return;
+  const a=exo(win(t,tIn,tIn+1.1)),b=eio(win(t,tOut,tOut+.7));x.save();x.beginPath();x.rect(lerp(x0,x1,b),y0,(x1-x0)*a-(x1-x0)*b+ (b>0?0:0),y1-y0);x.clip();draw();x.restore();}
+function head(eb,h,sub,tIn,tOut){block(tIn,tOut,()=>{T(eb,110,112,{s:22,w:600,c:MUTE,ls:4});T(h,108,186,{s:64,w:650,ls:-1.5});if(sub)T(sub,112,232,{s:24,c:MUTE});},{y1:260});}
+function poly(pts,frac=1){const n=Math.max(0,Math.min(pts.length-1,frac*(pts.length-1)));const k=Math.floor(n);if(n<=0)return;x.beginPath();x.moveTo(...pts[0]);
+  for(let i=1;i<=k;i++)x.lineTo(...pts[i]);if(k<pts.length-1){const f=n-k;x.lineTo(lerp(pts[k][0],pts[k+1][0],f),lerp(pts[k][1],pts[k+1][1],f));}x.stroke();}
+function bez(p0,p1,p2,p3,n=40){const r=[];for(let i=0;i<=n;i++){const t=i/n,u=1-t;r.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}return r;}
+
+/* ═════════ 全片 88 秒：序 → 三处断 → 变化 1–4 → 放大 ═════════ */
+let NOW=0;
+const AY=330,N=40,Y0=430,GAP=9;
+const STG=[['员工提出',170],['团队长审核',560],['部门评估',960],['开发',1180],['上线',1400],['推广',1620],['效果',1840]];
+const LINES=[...Array(N)].map((_,i)=>{const y=Y0+i*GAP,pass=i<8;
+  if(pass){const ty=578+i*6;return {i,pass,y,ty,tail:bez([560,y],[740,y],[760,ty],[960,ty])};}
+  const k=i-8,ey=760+k*11,ex=1150+k*14;return {i,pass,y,tail:bez([560,y],[700,y],[760+k*4,ey-80],[ex,ey+60])};});
+function eyebrow(s,tIn,tOut){block(tIn,tOut,()=>T(s,110,112,{s:22,w:600,c:OR4,ls:4}),{y1:130});}
+function title(h,sub,tIn,tOut){block(tIn,tOut,()=>{T(h,108,186,{s:60,w:650,ls:-1.5});if(sub)T(sub,112,232,{s:23,c:MUTE});},{y0:130,y1:260});}
+
+/* ── 序 + 三处断（0–20） ── */
+const FC=50,FR=30,FX=760,FY=330,FG=21;
+const DOTS=[...Array(FC*FR)].map((_,n)=>({x:FX+(n%FC)*FG,y:FY+((n/FC)|0)*FG,c:n%FC}));
+const ACTIVE=new Set();while(ACTIVE.size<200)ACTIVE.add((rnd()*1500)|0);
+const NEEDS=[...Array(800)].map((_,n)=>({x:760+rnd()*1040,y:300+rnd()*660,row:n%40,d:rnd()*2.2}));
+function sceneOpen(t){if(t>21)return;
+  const zoom=eio(win(t,18.6,20.6));                // 推进「语言断」→ 一根线放大成一道橙色笔触
+  x.save();const zx=365,zy=Y0+3*GAP;x.translate(zx,zy);x.scale(1+zoom*16,1+zoom*16);x.translate(-zx,-zy);
+  // 工具点阵
+  const ta=(1-eio(win(t,5,6.4))*.8)*(1-win(t,9,10.5));x.globalAlpha=1;
+  if(ta>0){x.globalAlpha=ta;for(let n=0;n<DOTS.length;n++){const d=DOTS[n];const lit=ACTIVE.has(n)&&t>.3+d.c/FC*2.2;x.fillStyle=lit?INK:'rgba(110,120,86,.38)';x.beginPath();x.arc(d.x,d.y,lit?3.6:2.6,0,7);x.fill();}x.globalAlpha=1;}
+  // 需求点 → 线
+  const headX=lerp(170,560,eio(win(t,6.6,9.6)));
+  if(t>5)for(const n of NEEDS){const show=crit(t-5.1-n.d*.3,7);const go=eio(win(t,6.6+n.d*.9,7.8+n.d*.9));if(go>=1||show<=0)continue;const ty=Y0+n.row*GAP;
+    const px=lerp(n.x,headX,go),py=lerp(n.y,ty,go);const sp=Math.sin(Math.PI*go);x.fillStyle=n.row<8?OR:(go>0?GR:INK);x.globalAlpha=show;
+    x.beginPath();x.ellipse(px,py,2.6+sp*9,2.4,Math.atan2(ty-n.y,headX-n.x),0,7);x.fill();x.globalAlpha=1;}
+  if(t>6.4){
+    // 轴
+    const ax=eio(win(t,9.4,11));if(ax>0){x.globalAlpha=1-zoom;x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(170,AY);x.lineTo(lerp(170,1840,ax),AY);x.stroke();
+      STG.forEach(([s,X],i)=>{if(X>lerp(170,1840,ax)+1)return;const on=i<3;x.fillStyle=on?YE:P;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(X,AY,8,0,7);x.fill();x.stroke();
+        T(s,X,AY-30,{s:24,w:on?650:450,a:X>1800?'right':'center',c:on?INK:MUTE});});x.globalAlpha=1;}
+    const split=eio(win(t,10.4,13)),rej=eio(win(t,11.2,14));
+    for(let k=N-1;k>=0;k--){const L=LINES[k];x.strokeStyle=L.pass?OR:GR;x.lineWidth=L.pass?2.2:1.3;x.globalAlpha=(L.pass?1:.72)*(k===3?1:1-zoom);
+      x.beginPath();x.moveTo(170,L.y);x.lineTo(headX,L.y);x.stroke();if(headX>=559){if(L.pass)poly(L.tail,split);else poly(L.tail,rej*.94);}}
+    x.globalAlpha=1-zoom;
+    const brk=win(t,13,15);if(brk>0)for(let i=0;i<8;i++){const y=578+i*6;for(let X=968;X<1860;X+=14){const f=(X-968)/900;if(f>brk)continue;x.globalAlpha=Math.max(0,1-f)*(1-zoom);x.fillStyle=OR;x.beginPath();x.arc(X,y,1.4*(1-f*.6),0,7);x.fill();}}
+    x.globalAlpha=1;
+    // 三处断
+    [[365,404,'① 语言断','一线说的，一半是问题一半是需求',14.6],[960,520,'② 责任断','评估之后，没人对「做成没有」负责',15.6],[1400,700,'③ 数据断','开发 · 上线 · 效果，没有记录',16.6]].forEach(([X,Y,a,b,t0])=>{const p=exo(win(t,t0,t0+.9));if(p<=0)return;
+      x.globalAlpha=p*(1-zoom);x.strokeStyle=OR4;x.lineWidth=1.6;x.beginPath();x.moveTo(X-10,Y-10);x.lineTo(X+10,Y+10);x.moveTo(X+10,Y-10);x.lineTo(X-10,Y+10);x.stroke();
+      T(a,X+18,Y-14,{s:22,w:650,c:OR4});T(b,X+18,Y+12,{s:17,c:BODY});x.globalAlpha=1;});
+    T('800+',150,412,{s:54,w:250,ls:-2,op:(1-zoom)*win(t,9,10)});T('评审通过 20% · 约 160',980,560,{s:22,w:600,c:OR4,op:(1-zoom)*win(t,12.4,13.2)});
+  }
+  x.restore();
+  eyebrow('现状 · 我们有什么',.2,4.8);title('1500+ 个工具，每天在用的约 13%','日活 200+；背后是 1000+ 名认证数字化专才，人均一个工具。',.3,4.8);
+  eyebrow('需求的去向',5.2,18.2);title('800+ 条需求：通过 20%，然后断了三次','需求多是「点状」的；进了流程，汇成 40 根线（一根 = 20 条）。',5.3,18.2);
+}
+
+/* ── 变化 1：便签 → 问题卡（20–31） ── */
+const CARD={x:110,y:270,w:380,h:470};
+const FIELDS=[['普遍痛点','3 个岗位都在手工核对同一类信息'],['发生频率','每人每天多次'],['影响程度','占工时、易出错，返工'],['优化效益','节省工时 → 可折算成本'],['根因（归因后）','两套系统数据不通，靠人搬']];
+function sceneCard(t,ox=0){if(t<20.5||t>46)return;x.save();x.translate(ox,0);
+                        // 放大的橙色笔触 → 收成便签下划线
+  const settle=eio(win(t,23.6,25.4));                    // 便签 → 卡片头部
+  const qx=lerp(560,CARD.x+24,settle),qy=lerp(560,CARD.y+120,settle),qs=lerp(54,19,settle);
+  if(t>20.5&&t<21.8){const b=eio(win(t,20.5,21.7));x.fillStyle=OR;const h=lerp(38,4,b),yc=lerp(457,qy+qs*.5,b),x0=lerp(0,560,b),x1=lerp(1920,560+qs*15.5,b);x.fillRect(x0,yc-h/2,x1-x0,h);}
+  // 卡片框
+  const cf=eio(win(t,23.8,25.2));if(cf>0){x.globalAlpha=cf;x.fillStyle='rgba(255,255,255,.55)';x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1.2;x.beginPath();x.roundRect(CARD.x,CARD.y,CARD.w,CARD.h,10);x.fill();x.stroke();
+    T('问题卡',CARD.x+24,CARD.y+44,{s:26,w:650});T('示意',CARD.x+CARD.w-24,CARD.y+42,{s:16,c:OR4,a:'right',w:600});T('一线原话',CARD.x+24,CARD.y+92,{s:17,c:MUTE,w:600});x.globalAlpha=1;}
+  // 原话（便签）
+  T('「想要个工具，帮我核对保单信息」',qx,qy,{s:qs,w:settle>.5?450:600,op:exo(win(t,21.2,22))});
+  if(t>=21.7&&settle<1){x.strokeStyle=OR;x.lineWidth=lerp(4,0,settle);x.beginPath();x.moveTo(qx,qy+qs*.5);x.lineTo(qx+qs*15.5*(1-settle*.1),qy+qs*.5);x.stroke();}
+  if(t>21.6&&t<23.8)T('这是一半问题、一半需求。',560,640,{s:24,c:MUTE,op:exo(win(t,22,22.8))*(1-win(t,23.4,23.8))});
+  // 四栏 + 根因：一栏一栏「写」出来
+  FIELDS.forEach(([k,v],i)=>{const st=25.4+i*.85;const p=exo(win(t,st,st+.7));if(p<=0)return;const y=CARD.y+164+i*58;
+    x.save();x.beginPath();x.rect(CARD.x+20,y-24,(CARD.w-40)*p,60);x.clip();T(k,CARD.x+24,y,{s:17,c:MUTE,w:600});T(v,CARD.x+24,y+26,{s:19,c:i===4?OR4:INK,w:i===4?650:450});x.restore();});
+  if(t<31.2){const rp=eio(win(t,25.4,29.6));x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.setLineDash([3,6]);x.beginPath();x.moveTo(CARD.x+CARD.w+20,CARD.y+180);x.lineTo(CARD.x+CARD.w+20+380*rp,CARD.y+180);x.stroke();x.setLineDash([]);
+    T('前线 A：把「我要个工具」翻译成问题',CARD.x+CARD.w+40,CARD.y+168,{s:22,w:650,op:rp*(1-win(t,30.4,31.2))});
+    T('写清普遍性、频率、影响、效益，再追到根因',CARD.x+CARD.w+40,CARD.y+200,{s:18,c:BODY,op:rp*(1-win(t,30.4,31.2))});}
+  x.restore();
+  eyebrow('变化 1 / 4 · 入口',20.2,30.6);title('从「我要个工具」，到一张问题卡','以前说不清的四件事，现在写在卡上；最后一栏是根因。',20.3,30.6);
+}
+
+/* ── 变化 2：四道闸门（31–45） ── */
+const GX=560,GW=420,GY=[300,430,560,690];
+const Q=['值不值得做？','问题在一个环节内？','流程本身合理，只是衔接断了？','根因在流程 / 规则 / 岗位本身？'];
+const Qs=['影响面 × 频率 × 效益；资产库里有没有现成的','只涉及一个岗位 / 一个工具','跨多个环节、多个系统','不改流程，问题会反复出现'];
+const OUTS=[['不做','','前线 A + 职能 判定','不投资源','当周出结论 · 写明原因，问题入库等聚类'],['单点优化','· 点','前线 B 牵头，专才改工具','小：一个工具 / 功能','约 2–4 周 · 工具改版 + 回原问题验收'],
+  ['全链路优化','· 线','前线 B 牵头，职能协调跨部门','中：多系统 / 多环节打通','约 1–3 个月 · 串联方案 + 数据打通'],['流程重塑','· 面','3+1 提方案，科技副总监拍板','大：流程 / 规则 / 岗位调整','约一个季度 · 新流程 + 制度 + 跨线复制']];
+const OX=GX+GW+90;
+function sceneGates(t,ox=0){if(t<30.6||t>47)return;x.save();x.translate(ox,0);
+  const g=eio(win(t,31,32.4));
+  // 主干
+  x.strokeStyle=INK;x.lineWidth=1.6;poly(bez([CARD.x+CARD.w,CARD.y+CARD.h/2],[CARD.x+CARD.w+40,CARD.y+CARD.h/2],[GX-40,GY[0]],[GX,GY[0]],24),g);
+  if(g>=1){x.beginPath();x.moveTo(GX+14,GY[0]);x.lineTo(GX+14,lerp(GY[0],GY[3],eio(win(t,32.4,33.6))));x.stroke();}
+  Q.forEach((q,i)=>{const st=32.6+i*.45;const p=crit(t-st,8);if(p<=0)return;const y=GY[i];x.fillStyle=P;x.strokeStyle=INK;x.lineWidth=1.6;
+    x.save();x.translate(GX+14,y);x.rotate(Math.PI/4);x.scale(p,p);x.fillRect(-11,-11,22,22);x.strokeRect(-11,-11,22,22);x.restore();
+    T(q,GX+46,y-4,{s:22,w:650,op:p});T(Qs[i],GX+46,y+24,{s:16,c:BODY,op:p});
+    // 出口
+    const op=exo(win(t,st+.5,st+1.2));if(op<=0)return;x.strokeStyle=i===0?GRL:'rgba(229,122,50,.45)';x.lineWidth=1.6;x.beginPath();x.moveTo(GX+GW-20,y);x.lineTo(GX+GW-20+90*op,y);x.stroke();
+    const o=OUTS[i],ix=OX+18;x.globalAlpha=op;
+    if(i===0){x.strokeStyle=GRL;x.beginPath();x.arc(ix,y,8,0,7);x.stroke();x.beginPath();x.moveTo(ix-12,y+12);x.lineTo(ix+12,y-12);x.stroke();}
+    if(i===1){x.fillStyle=OR;x.beginPath();x.arc(ix,y,10,0,7);x.fill();}
+    if(i===2){x.strokeStyle=OR;x.lineWidth=3;x.beginPath();x.moveTo(ix-16,y+8);x.lineTo(ix-4,y-8);x.lineTo(ix+6,y+6);x.lineTo(ix+18,y-6);x.stroke();}
+    if(i===3){for(let r=0;r<6;r++){x.strokeStyle=`rgba(214,104,44,${1-r*.13})`;x.lineWidth=1.2;x.beginPath();x.ellipse(ix,y,6+r*3.4,4+r*2.4,0,0,7);x.stroke();}}
+    T(o[0],ix+40,y-6,{s:26,w:650,c:i===0?MUTE:INK});if(o[1]){x.font=`650 26px ${FONT}`;T(o[1],ix+40+x.measureText(o[0]).width+8,y-6,{s:22,w:650,c:OR4});}
+    T(o[2],ix+40,y+22,{s:17,c:BODY});T(o[3],ix+370,y-8,{s:17,w:600});T(o[4],ix+370,y+18,{s:16,c:BODY});x.globalAlpha=1;});
+  // 这张示意卡走哪条路：在第 3 道闸门命中「全链路」
+  const run=eio(win(t,36,38.6));if(run>0){const path=[[GX+14,GY[0]],[GX+14,GY[1]],[GX+14,GY[2]],[GX+GW+70,GY[2]],[OX+18,GY[2]]];x.strokeStyle=OR;x.lineWidth=3.4;x.lineCap='round';poly(path,run);x.lineCap='butt';
+    if(run>=1){const pul=crit(t-38.6,7);x.strokeStyle=OR;x.lineWidth=1.5;x.beginPath();x.roundRect(OX-10,GY[2]-44,1810-OX+10,88,8);x.globalAlpha=pul;x.stroke();x.globalAlpha=1;
+      T('← 这张卡：根因在系统之间，流程本身合理',GX+46,GY[2]+56,{s:17,c:OR4,w:600,op:pul});}}
+  block(39.6,44.2,()=>{T('模式创新不是规划出来的，是归因归出来的。',110,900,{s:34,w:650});T('同一根因聚得够多，就从点升级成线、成面——不做的，也留下原因入库。',112,946,{s:21,c:BODY});},{y0:850,y1:970});
+  x.restore();
+  eyebrow('变化 2 / 4 · 评审',31,44);title('一张问题卡，四道闸门：改多深','每个出口都有拍板人、资源量级、周期和交付物（周期为推测）。',31.1,44);
+}
+
+/* ── 变化 3：3+1 接力（45–58） ── */
+const SX=[470,700,930,1160,1390,1620],RS=['需求发生','需求评审','开发供给','测试上线','推广验证','总结沉淀'],LY=[380,486,592,698];
+const LANE=[['前线 A','问题：听一线、做归因',INK],['前线 B','方案：定方案、盯开发',INK],['前线 C','推广：推下去、看数据',INK],['职能 1 人','资源：业管 · 综管 · 财企',OR4]];
+const RSTEP=[{lead:[[0,'溯源一线问题']],help:[]},{lead:[[0,'归因 · 聚类']],help:[[1,'定处置深度'],[3,'审核 · 看资源']]},{lead:[[1,'方案 + 落地计划'],[3,'争取人 · 钱 · 系统']],help:[[2,'选试点']]},
+  {lead:[[1,'组织业务验收']],help:[[0,'回原问题验证'],[2,'备培训'],[3,'配套制度流程']]},{lead:[[2,'培训推广 · 跟数据']],help:[[0,'收集反馈'],[3,'纳入考核机制']]},{lead:[[2,'效果复盘']],help:[[1,'资产入库'],[3,'跨线复制'],[0,'新问题回流']]}];
+const ROUT=['问题卡','评审结论','方案书 · 排期','验收单','使用周报','资产卡'],RKPI=['频率 · 影响 · 效益','评审周期','按期率','一次通过率','使用率 · 覆盖率','节省工时 · 复用次数'];
+const RPATH=(()=>{const pts=[[SX[0]-80,LY[0]]];let prev=pts[0];const nodes=[];RSTEP.forEach((st,i)=>st.lead.forEach(([k])=>{const p=[SX[i],LY[k]];const mx=(prev[0]+p[0])/2;bez(prev,[mx,prev[1]],[mx,p[1]],p,18).slice(1).forEach(q=>pts.push(q));nodes.push({i,k,idx:pts.length-1});prev=p;}));
+  bez(prev,[prev[0]+60,prev[1]],[1760,prev[1]],[1800,prev[1]],10).slice(1).forEach(q=>pts.push(q));return {pts,nodes};})();
+function sceneRelay(t,ox=0){if(t<44||t>60)return;x.save();x.translate(ox,0);x.globalAlpha=1-win(t,57,58.4);
+  const g=eio(win(t,44.6,46));x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(SX[0]-40,300);x.lineTo(lerp(SX[0]-40,SX[5]+120,g),300);x.stroke();
+  RS.forEach((s,i)=>{const p=crit(t-44.8-i*.12,9);if(p<=0)return;x.fillStyle=YE;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(SX[i],300,7*p,0,7);x.fill();x.stroke();T(s,SX[i],282,{s:22,w:650,a:'center',op:p});});
+  LANE.forEach(([n,d,col],k)=>{const p=exo(win(t,45+k*.2,46+k*.2));if(p<=0)return;const y=LY[k];x.globalAlpha*=p;x.strokeStyle='rgba(30,34,28,.12)';x.setLineDash([2,6]);x.beginPath();x.moveTo(SX[0]-60,y);x.lineTo(SX[5]+140,y);x.stroke();x.setLineDash([]);
+    x.fillStyle=col;x.beginPath();x.arc(126,y-6,7,0,7);x.fill();T(n,142,y,{s:24,w:650,c:col});T(d,142,y+28,{s:17,c:BODY});x.globalAlpha=1-win(t,57,58.4);});
+  // 接力：橙线一段段走过每个主责人
+  const run=win(t,46.6,55.4);const fr=run;x.strokeStyle=OR;x.lineWidth=3.2;x.lineJoin='round';x.lineCap='round';poly(RPATH.pts,eio(fr));x.lineCap='butt';
+  const reached=eio(fr)*(RPATH.pts.length-1);
+  RPATH.nodes.forEach(nd=>{if(reached<nd.idx)return;const tt=t-(46.6+(nd.idx/(RPATH.pts.length-1))*8.8);const p=crit(tt,8);const st=RSTEP[nd.i];
+    const lab=st.lead.find(([k])=>k===nd.k)[1];x.fillStyle=nd.k===3?OR4:OR;x.beginPath();x.arc(SX[nd.i],LY[nd.k],11*p,0,7);x.fill();T(lab,SX[nd.i]+16,LY[nd.k]-14,{s:18,w:650,op:p});
+    st.help.forEach(([k,h],j)=>{const q=crit(tt-.2-j*.1,8);if(q<=0)return;x.strokeStyle=k===3?OR4:INK;x.fillStyle=P;x.lineWidth=1.6;x.beginPath();x.arc(SX[nd.i],LY[k],7*q,0,7);x.fill();x.stroke();T(h,SX[nd.i]+14,LY[k]-12,{s:16,c:BODY,op:q});});
+    if(nd.k===st.lead[0][0]){const q=exo(win(tt,.3,1));T(ROUT[nd.i],SX[nd.i],870,{s:20,w:600,a:'center',c:OR4,op:q});T(RKPI[nd.i],SX[nd.i],904,{s:16,a:'center',c:BODY,op:q});}});
+  x.strokeStyle='rgba(30,34,28,.3)';x.lineWidth=1;x.beginPath();x.moveTo(110,820);x.lineTo(lerp(110,1810,g),820);x.stroke();
+  T('交付物',110,870,{s:20,w:650,op:g});T('看什么数',110,904,{s:20,w:650,op:g});
+  x.restore();
+  eyebrow('变化 3 / 4 · 责任',45,56.4);title('3 + 1：每一步，都有人推着走','实心点 = 这一步的主责人，空心点 = 协同（分工为推演）。以前评估之后就没人了。',45.1,56.6);
+}
+
+/* ── 变化 4：资产卡 → 资产库（面）→ 复用（58–76）；结尾：一张全流程图（76–88） ── */
+const AC={x:150,y:290,w:560,h:420};          // 资产卡最终位置
+const LIB={x:840,y:300,cw:150,ch:84,gap:12,cols:6,rows:5};
+const TYPES=['工具','流程','规则','数据'];
+const LIB_PRE=[...Array(11)].map((_,i)=>({slot:[0,1,2,3,5,6,8,9,11,13,14][i],type:TYPES[(i*7+3)%4]}));
+const NEW_SLOT=7;
+const slotXY=s=>[LIB.x+(s%LIB.cols)*(LIB.cw+LIB.gap),LIB.y+((s/LIB.cols)|0)*(LIB.ch+LIB.gap)];
+function libCard(X,Y,w,h,type,{hl=0,label=null,alpha=1}={}){x.save();x.globalAlpha*=alpha;x.fillStyle=hl?'rgba(229,122,50,.10)':'rgba(255,255,255,.55)';x.strokeStyle=hl?OR:'rgba(30,34,28,.28)';x.lineWidth=hl?2:1;
+  x.beginPath();x.roundRect(X,Y,w,h,6);x.fill();x.stroke();
+  // 极简图示：工具 = 点，流程 = 线，规则 = 条，数据 = 面
+  const cx=X+22,cy=Y+h/2;x.fillStyle=x.strokeStyle=hl?OR:GR;x.lineWidth=1.6;
+  if(type==='工具'){x.beginPath();x.arc(cx,cy,5,0,7);x.fill();}
+  if(type==='流程'){x.beginPath();x.moveTo(cx-8,cy+5);x.lineTo(cx-2,cy-5);x.lineTo(cx+3,cy+3);x.lineTo(cx+9,cy-4);x.stroke();}
+  if(type==='规则'){[-5,0,5].forEach(d=>{x.beginPath();x.moveTo(cx-8,cy+d);x.lineTo(cx+8,cy+d);x.stroke();});}
+  if(type==='数据'){x.globalAlpha*=.6;x.fillRect(cx-8,cy-6,16,12);}
+  x.restore();T(label||type,X+40,Y+h/2+6,{s:16,c:hl?OR4:BODY,w:hl?650:400,op:alpha});}
+function sceneAssets(t){if(t<56.8||t>78)return;
+  const out=1-eio(win(t,75.6,77));x.save();x.globalAlpha=out;
+  // ① 资产卡：从「总结沉淀」那个节点里长出来（接力线的终点）
+  const g=eio(win(t,57.2,59.2));const sx=1620,sy=592;
+  const cx=lerp(sx,AC.x,g),cy=lerp(sy,AC.y,g),cw=lerp(12,AC.w,g),ch=lerp(12,AC.h,g);
+  const fly=eio(win(t,66.4,68.2));                         // ③ 卡片缩小飞进资产库
+  const [tx,ty]=slotXY(NEW_SLOT);const fx=lerp(cx,tx,fly),fy=lerp(cy,ty,fly),fw=lerp(cw,LIB.cw,fly),fh=lerp(ch,LIB.ch,fly);
+  if(fly<1){x.fillStyle='rgba(255,255,255,.6)';x.strokeStyle=OR;x.lineWidth=1.6;x.beginPath();x.roundRect(fx,fy,fw,fh,10*(1-fly)+6*fly);x.fill();x.stroke();
+    const tp=exo(win(t,58.8,59.8))*(1-win(t,66.2,66.8));if(tp>0){x.save();x.globalAlpha*=tp;
+      T('资产卡',AC.x+28,AC.y+48,{s:28,w:650});T('示意',AC.x+AC.w-28,AC.y+46,{s:16,c:OR4,a:'right',w:600});
+      x.strokeStyle='rgba(30,34,28,.15)';x.beginPath();x.moveTo(AC.x+28,AC.y+68);x.lineTo(AC.x+AC.w-28,AC.y+68);x.stroke();
+      [['名称','保单信息自动核对'],['解决的根因','两套系统数据不通，靠人搬'],['可复用的部分','数据接口 + 核对规则（数据 · 规则）'],['效果','节省工时、差错下降 → 折算成本（上线后实测）'],['适用场景','产险 / 人身险 同类核对岗位']].forEach(([k,v],i)=>{
+        const p=exo(win(t,59.6+i*.7,60.3+i*.7));if(p<=0)return;const y=AC.y+112+i*60;x.save();x.beginPath();x.rect(AC.x+24,y-24,(AC.w-48)*p,60);x.clip();
+        T(k,AC.x+28,y,{s:17,c:MUTE,w:600});T(v,AC.x+28,y+26,{s:20,c:i===2?OR4:INK,w:i===2?650:450});x.restore();});
+      x.restore();}}
+  // ② 资产库：一张张卡铺成一面
+  const lp=exo(win(t,62.6,64));if(lp>0){x.save();x.globalAlpha*=lp;T('资产库',LIB.x,LIB.y-30,{s:24,w:650});T('每闭环一个问题，库里多一张卡（示意）',LIB.x+100,LIB.y-30,{s:17,c:MUTE});
+    for(let s=0;s<LIB.cols*LIB.rows;s++){const [X,Y]=slotXY(s);x.strokeStyle='rgba(30,34,28,.10)';x.setLineDash([3,5]);x.strokeRect(X+.5,Y+.5,LIB.cw,LIB.ch);x.setLineDash([]);}
+    LIB_PRE.forEach((c,i)=>{const p=crit(t-63-i*.12,9);if(p<=0)return;const [X,Y]=slotXY(c.slot);libCard(X,Y,LIB.cw,LIB.ch,c.type,{alpha:p});});x.restore();}
+  if(fly>=1){const [X,Y]=slotXY(NEW_SLOT);const hl=t>69.6?1:0;libCard(X,Y,LIB.cw,LIB.ch,'数据',{hl,label:'保单核对'});}
+  // ④ 新问题进来：先去库里匹配，命中就复用
+  const np=eio(win(t,68.6,70));if(np>0){const nx=lerp(-400,150,np),ny=800;x.fillStyle='rgba(255,255,255,.6)';x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1.2;x.beginPath();x.roundRect(nx,ny,560,96,8);x.fill();x.stroke();
+    T('新问题卡',nx+24,ny+36,{s:18,w:650});T('示意',nx+536,ny+34,{s:15,c:OR4,a:'right',w:600});T('人身险保全岗，也在手工核对客户信息',nx+24,ny+70,{s:19});
+    const m=eio(win(t,69.6,71));if(m>0){const [X,Y]=slotXY(NEW_SLOT);x.strokeStyle=OR;x.lineWidth=2;poly(bez([nx+560,ny+48],[nx+700,ny+48],[X+LIB.cw/2,Y+LIB.ch+120],[X+LIB.cw/2,Y+LIB.ch],24),m);
+      if(m>=1)T('同一根因 → 命中：直接复用接口 + 规则',nx+600,ny-14,{s:19,w:650,c:OR4,op:exo(win(t,71,71.8))});}
+    // 复用后的路径：跳过「开发」
+    const r=exo(win(t,71.6,73));if(r>0){const st=['需求发生','需求评审','开发供给','测试上线','推广验证'],bx=nx+600,by=ny+72;
+      st.forEach((s,i)=>{const X=bx+i*150;const skip=i===2;x.globalAlpha=out*r*(skip?.4:1);x.fillStyle=skip?P:YE;x.strokeStyle=INK;x.lineWidth=1.3;x.beginPath();x.arc(X,by,6,0,7);x.fill();x.stroke();
+        T(s,X,by+28,{s:15,a:'center',c:skip?MUTE:INK});});x.globalAlpha=out*r;x.strokeStyle=OR;x.lineWidth=2;x.beginPath();x.moveTo(bx,by);x.lineTo(bx+150,by);x.bezierCurveTo(bx+220,by-40,bx+380,by-40,bx+450,by);x.lineTo(bx+600,by);x.stroke();
+      T('复用',bx+300,by-36,{s:15,w:650,a:'center',c:OR4});x.globalAlpha=out;}
+    const k=exo(win(t,73,74));if(k>0){T('复用次数',150,430,{s:22,c:MUTE,op:k});T('1 → 2',150,500,{s:64,w:300,c:OR4,op:k});T('这类问题的周期：数月 → 数周（推测）',152,550,{s:20,c:BODY,op:k});T('节省的工时，折算成财务价值',152,582,{s:20,c:BODY,op:k});}
+  }
+  x.restore();
+  eyebrow('变化 4 / 4 · 结果',57.4,75.4);title('面，是一张张资产卡铺出来的','每闭环一个问题，留下一张资产卡；下一个相似问题先查库，命中就复用，不必从头开发。',57.5,75.4);
+}
+
+/* ── 结尾：一张全流程图（现在 · 补全 · 谁负责 · 资产回流） ── */
+function sceneMap(t){if(t<76.2)return;
+  const MX=[230,520,810,1100,1390,1680],MY=470,S=['需求发生','需求评审','开发供给','测试上线','推广验证','总结沉淀'];
+  const WHO=['前线 A','A 归因 · 职能审','B 方案 · 职能资源','B 验收','C 推广','C 复盘 · B 入库'];
+  const NOW_=['员工提出','团队长审核 · 部门评估','','','',''];
+  const ADD=['问题卡','四道闸门：不做 / 点 / 线 / 面','方案书 · 排期','验收单','使用周报','资产卡 → 资产库'];
+  const d=eio(win(t,76.6,79.4));
+  // 主线：已有的一段（绿）+ 补全（橙）
+  x.lineCap='round';x.strokeStyle=GR;x.lineWidth=7;x.beginPath();x.moveTo(MX[0],MY);x.lineTo(lerp(MX[0],MX[1]+60,clamp(d*3.5)),MY);x.stroke();
+  if(d>.28){x.strokeStyle=OR;x.beginPath();x.moveTo(MX[1]+60,MY);x.lineTo(lerp(MX[1]+60,MX[5],clamp((d-.28)/.72)),MY);x.stroke();}x.lineCap='butt';
+  MX.forEach((X,i)=>{const p=crit(t-76.8-i*.3,9);if(p<=0)return;const on=i<2;x.fillStyle=P;x.strokeStyle=on?GR:OR4;x.lineWidth=3;x.beginPath();x.arc(X,MY,13*p,0,7);x.fill();x.stroke();
+    T(`0${i+1}`,X,MY-62,{s:16,c:MUTE,a:'center',op:p});T(S[i],X,MY-32,{s:24,w:650,a:'center',op:p});
+    if(NOW_[i])T(NOW_[i],X,MY+44,{s:17,c:GR,a:'center',w:600,op:p});
+    T(ADD[i],X,MY+(NOW_[i]?72:44),{s:17,c:OR4,a:'center',w:600,op:p});T(WHO[i],X,MY+(NOW_[i]?100:72),{s:16,c:BODY,a:'center',op:p});});
+  // 资产回流：从「总结沉淀」绕上方回到「需求发生」
+  const r=eio(win(t,79.6,81.4));if(r>0){x.strokeStyle=OR;x.lineWidth=1.8;x.setLineDash([4,8]);poly(bez([MX[5],MY-80],[MX[5],MY-190],[MX[0],MY-190],[MX[0],MY-80],40),r);x.setLineDash([]);
+    if(r>=1)T('资产回流：下一个问题，提得更准、接得更快',(MX[0]+MX[5])/2,MY-200,{s:19,w:600,c:OR4,a:'center'});}
+  // 图例
+  const lg=exo(win(t,79,80));if(lg>0){x.globalAlpha=lg;x.fillStyle=GR;x.fillRect(1440,262,36,7);T('现在已在做',1486,272,{s:18,c:MUTE});x.fillStyle=OR;x.fillRect(1610,262,36,7);T('补全',1656,272,{s:18,c:MUTE});x.globalAlpha=1;}
+  // 客服线的作战单元
+  const u=exo(win(t,81.4,82.6));if(u>0){x.save();x.globalAlpha=u;x.strokeStyle='rgba(30,34,28,.3)';x.lineWidth=1;x.beginPath();x.moveTo(110,700);x.lineTo(1810,700);x.stroke();
+    T('客服线 · 最小作战单元',110,752,{s:22,w:650});
+    const dot=(X,Y,col)=>{x.fillStyle=col;x.beginPath();x.arc(X,Y,8,0,7);x.fill();};
+    [0,1,2].forEach(i=>dot(420+i*26,746,INK));T('产险 · 前线 3 人',510,752,{s:20});
+    [0,1,2].forEach(i=>dot(760+i*26,746,INK));T('人身险 · 前线 3 人',850,752,{s:20});
+    dot(1110,746,OR4);T('业管 · 职能 1 人（审核需求、争取资源）',1130,752,{s:20,c:OR4,w:600});
+    T('共同对需求的落地效果负责：从需求发生，一路到资产沉淀。',112,792,{s:18,c:BODY});x.restore();}
+  // 四个变化
+  const c4=exo(win(t,82.8,84));if(c4>0){x.save();x.globalAlpha=c4;[['入口','「我要个工具」→ 问题卡'],['评审','过 / 不过 → 按根因定深度'],['责任','审批人 → 3+1 责任人'],['结果','看不清 → 有数、可复用']].forEach(([a,b],i)=>{
+      const X=110+i*440;T('变化 '+(i+1),X,868,{s:16,c:MUTE,w:600});T(a,X,898,{s:22,w:650,c:OR4});T(b,X+56,898,{s:20});});x.restore();}
+  block(76.4,999,()=>{T('需求管理全流程 · 一张图看现在与补全',110,112,{s:22,w:600,c:OR4,ls:3});T('从点，到线，到面，成体系。',106,196,{s:72,w:650,ls:-1.5});},{y1:230});
+  block(84.6,999,()=>{T('科技副总监：拍板流程重塑、协调跨部门资源，把这套机制推到更多条线。',110,1010,{s:22,w:600});},{y0:980,y1:1030});
+}
+
+/* ── 主时间线 ── */
+function frame(t){NOW=t;x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.drawImage(paper,0,0);
+  sceneOpen(t);
+  // 变化 1 → 2：卡片不动，闸门在右边长出来（同一张卡贯穿）
+  sceneCard(t, -1920*eio(win(t,44,45.8)));
+  sceneGates(t,-1920*eio(win(t,44,45.8)));
+  // 变化 2 → 3：镜头向右横移，命中的橙色出口一路延伸成接力线的起点
+  if(t>43.6&&t<46.4){const p=eio(win(t,44,45.8));x.strokeStyle=OR;x.lineWidth=3.2;x.beginPath();x.moveTo(OX+18-1920*p,GY[2]);x.bezierCurveTo(1900-1920*p,GY[2],1920+200-1920*p,LY[0],SX[0]-80+1920-1920*p,LY[0]);x.stroke();}
+  sceneRelay(t,1920*(1-eio(win(t,44,45.8))));
+  sceneAssets(t);sceneMap(t);
+  if(t<18){x.globalAlpha=win(t,1,2)*(1-win(t,17,18));T('数据：1500+ 智能工具、日活 200+、1000+ 认证数字化专才、800+ 业务需求、评审通过率 20%（议题材料）；160 按比例估算。',110,1040,{s:17,c:MUTE});x.globalAlpha=1;}
+}
+
+/* ── 播放 ── */
+let t0=performance.now(),paused=false,pt=0;const sk=document.getElementById('sk');
+function loop(now){if(!paused){pt=(now-t0)/1000;if(pt>T_END+3){t0=now;pt=0;}sk.value=Math.min(pt,T_END);}frame(Math.min(pt,T_END));document.getElementById('tm').textContent=Math.min(pt,T_END).toFixed(1)+' / '+T_END+' s';requestAnimationFrame(loop);}
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;paused=false;document.getElementById('pp').textContent='暂停';};
+sk.oninput=()=>{pt=+sk.value;t0=performance.now()-pt*1000;};
+const fsT=()=>{const d=document.documentElement;if(!document.fullscreenElement){(d.requestFullscreen||d.webkitRequestFullscreen).call(d);}else{(document.exitFullscreen||document.webkitExitFullscreen).call(document);}};
+document.getElementById('fs').onclick=fsT;c.ondblclick=fsT;
+document.addEventListener('keydown',e=>{if(e.key==='f'||e.key==='F')fsT();if(e.key===' '){e.preventDefault();document.getElementById('pp').click();}});
+// 全屏时隐藏控制条，鼠标移动时出现
+const ctl=document.querySelector('.ctl');let hideT;document.addEventListener('mousemove',()=>{ctl.style.opacity=1;clearTimeout(hideT);if(document.fullscreenElement)hideT=setTimeout(()=>ctl.style.opacity=0,1800);});
+ctl.style.transition='opacity .4s';
+const qt=new URLSearchParams(location.search).get('t');
+if(qt!==null){paused=true;pt=+qt;(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{frame(pt);window.__ready=true;});}
+else (document.fonts?document.fonts.ready:Promise.resolve()).then(()=>{t0=performance.now();requestAnimationFrame(loop);});
+window.render=frame;
+</script></body></html>
