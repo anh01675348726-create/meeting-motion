@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>面 → 体 · 液态等高线</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#F4F1EA;overflow:hidden}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block;background:#F4F1EA}
+.ctl{position:fixed;left:16px;bottom:12px;font:13px/1.4 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#8B8C80}
+.ctl button{font:inherit;color:#1E221C;background:transparent;border:1px solid rgba(30,34,28,.25);border-radius:6px;padding:4px 10px;margin-right:6px;cursor:pointer}
+</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><span id="tm"></span></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif';
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',OR4='#B4521F';
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t;
+const win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+const exo=t=>t===1?1:1-Math.pow(2,-10*t);
+const sm=t=>t*t*(3-2*t);
+
+// 纸（一次性缓存）
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=P;g.fillRect(0,0,1920,1080);
+  let s=5;const R=()=>(s=(s*16807)%2147483647)/2147483647;const n=document.createElement('canvas');n.width=480;n.height=270;const ng=n.getContext('2d');const im=ng.createImageData(480,270);
+  for(let i=0;i<480*270;i++){const v=215+R()*40;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.35;g.drawImage(n,0,0,1920,1080);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+  g.strokeStyle='rgba(30,34,28,.045)';g.lineWidth=1;for(let i=40;i<1920;i+=40){g.beginPath();g.moveTo(i+.5,0);g.lineTo(i+.5,1080);g.stroke();}for(let i=40;i<1080;i+=40){g.beginPath();g.moveTo(0,i+.5);g.lineTo(1920,i+.5);g.stroke();}})();
+
+const PAT=x.createPattern(paper,'no-repeat');
+// 等高线面：M 根线（z 从后到前），每根线沿 x 采样
+const M=46,XL=140,XR=1840,STEP=10,BASE=900;
+const thick=X=>{const t=(X-XL)/(XR-XL);const rise=sm(clamp(t/.86));const tail=t>.92?sm((1-t)/.08):1;return (14+230*Math.pow(rise,1.5))*tail;};
+// 颜色：后排浅（果皮黄）→ 前排深（熟橙）
+const COL=j=>{const t=j/(M-1);const a=[246,206,140],b=[214,104,44];return `rgb(${lerp(a[0],b[0],t)|0},${lerp(a[1],b[1],t)|0},${lerp(a[2],b[2],t)|0})`;};
+
+function frame(t){
+  x.drawImage(paper,0,0);
+  // —— 段落时间 ——
+  const pour=win(t,0,2.6), spread=win(t,1.6,5.6), rise=eio(win(t,6.2,9.6)), swell=win(t,8.6,11), txt=win(t,9.8,11.2);
+  const kz=lerp(0,7.2,rise);            // 每往前一根线，向下错开多少（倾斜出纵深）
+  const kx=lerp(0,-2.4,rise);           // 同时略向左错，形成斜轴测
+  const H=lerp(0,1,rise);               // 高度场出现
+  const spreadX=lerp(XR,XL,eio(spread)); // 面从右往左漫开
+  // 倾泻：8 根橙线从右上落下
+  if(pour<1||t<6.6){const a=1-win(t,5.6,6.6);x.save();x.globalAlpha=a;for(let i=0;i<8;i++){const y0=-20,ty=BASE-thick(1700)*.9+i*2;const p=eio(pour);
+      x.strokeStyle='#E57A32';x.lineWidth=2.2;x.beginPath();x.moveTo(1880-i*7,y0);x.bezierCurveTo(1880-i*7,lerp(y0,ty,.5),1800-i*6,lerp(y0,ty,.6),1760-i*8,lerp(y0,ty,p));x.stroke();}x.restore();}
+  // 画等高线：后 → 前，每根线下方先用纸色填一遍（遮挡 → 产生体积）
+  for(let j=0;j<M;j++){
+    const fz=j/(M-1);                         // 0 后 → 1 前
+    const appear=clamp((spread*1.35-(1-fz)*.35));if(appear<=0)continue;
+    const zOff=(j-(M-1))*kz;                  // 前排在下
+    const pts=[];
+    for(let X=XL;X<=XR;X+=STEP){
+      if(X<spreadX-40)continue;
+      const th=thick(X);
+      // 平面状态：等高排线，越往下越密（d 映射到厚度）
+      const d=Math.pow(fz,1.25)*th;
+      const flatY=BASE-th+d;
+      // 体：沙丘一样的体量 —— 右高左低、前后两侧收下去，表面缓慢起伏的长波
+      const zEnv=Math.pow(Math.sin(Math.PI*(fz*.96+.02)),.75);
+      const wave=Math.sin(X/170 - t*1.1 + fz*3.2)*.55+Math.sin(X/310 + t*.6 - fz*2.1)*.45;
+      const hVol=th*1.35*zEnv*(1+.16*swell*wave);
+      const rowBase=BASE-30-(M-1-j)*7.4;
+      const y=lerp(flatY,rowBase-hVol,rise);
+      pts.push([X+(M-1-j)*2.6*rise, y]);
+    }
+    if(pts.length<2)continue;
+    // 左端淡入（面在漫开）
+    x.save();
+    x.globalAlpha=appear;
+    if(rise>0.02){x.fillStyle=PAT;x.beginPath();x.moveTo(pts[0][0],1080);pts.forEach(p=>x.lineTo(p[0],p[1]));x.lineTo(pts[pts.length-1][0],1080);x.closePath();x.fill();}
+    x.strokeStyle=COL(j);x.lineWidth=lerp(1,1.6,fz);x.lineJoin='round';x.beginPath();pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.stroke();
+    x.restore();
+  }
+  // 地平线
+  x.strokeStyle='rgba(30,34,28,.3)';x.lineWidth=1;x.beginPath();x.moveTo(110,BASE+.5+ (M-1)*0);x.lineTo(1890,BASE+.5);x.globalAlpha=1-rise;x.stroke();x.globalAlpha=1;
+  // 字
+  x.fillStyle=MUTE;x.font=`600 22px ${FONT}`;x.letterSpacing='4px';
+  const label=t<6.2?'总结 · 沉淀':'体系';x.fillText(label,110,112);x.letterSpacing='0px';
+  x.fillStyle=INK;x.font=`650 64px ${FONT}`;
+  const h1=t<6.2?'做成的方案，沉下来。':'面，长成了体。';x.globalAlpha=t<6.2?exo(win(t,.3,1.2)):exo(win(t,6.4,7.4));x.fillText(h1,108,186);
+  x.font=`400 24px ${FONT}`;x.fillStyle=MUTE;
+  x.fillText(t<6.2?'线一根根沉下来，织成一面：下一个相似的问题，不必从头开始。':'一层层沉淀的方案，叠成了能托住新问题的体系。',112,232);x.globalAlpha=1;
+  if(txt>0){x.globalAlpha=exo(txt);x.fillStyle=INK;x.font=`650 88px ${FONT}`;x.fillText('从点，到线，到面，成体系。',108,1010);x.globalAlpha=1;}
+}
+let t0=performance.now(),paused=false,pt=0;const T=14;
+function loop(now){if(!paused){pt=((now-t0)/1000);if(pt>T+2){t0=now;pt=0;}}frame(Math.min(pt,T));document.getElementById('tm').textContent=pt.toFixed(1)+' s';requestAnimationFrame(loop);}
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;};
+const qt=new URLSearchParams(location.search).get('t');
+if(qt!==null){paused=true;pt=+qt;document.fonts&&document.fonts.ready.then(()=>{frame(pt);window.__ready=true;});}else requestAnimationFrame(loop);
+</script></body></html>
