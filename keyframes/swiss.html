@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>瑞士线描 · 关键帧</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#F4F1EA}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+(async()=>{
+await document.fonts.load('600 80px "MiSans VF"','0123456789+·约个智能工具日活在用认证数字化专才人均需求一根线条去了哪里评审通过未通过员工提出团队长审核部门评估开发上线推广效果无记录断成点只回答做不没有对成负责从头到责任范围前线职能人业管综管财企同一根因改多深单全链路流程重塑这次沉淀下来的方案相似问题必开始双向面议题三走向模式创新现在已补全每段都跟数字审核提炼明确为争取资源方跟踪使验证效果');
+const S=+(new URLSearchParams(location.search).get('s')||3);
+const c=document.getElementById('c'),x=c.getContext('2d');
+const P='#F4F1EA',INK='#1E221C',MUTE='#8B8C80',GR='#6E7856',OR='#E57A32',YE='#EDB33B',OR4='#B4521F';
+let sd=7;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const F=(w,s)=>`${w} ${s}px "MiSans VF"`;
+function T(t,X,Y,o={}){x.save();x.font=F(o.w||400,o.s||24);x.fillStyle=o.c||INK;x.textAlign=o.a||'left';if(o.ls)x.letterSpacing=o.ls+'px';x.globalAlpha=o.op??1;x.fillText(t,X,Y);x.restore();}
+function noise(w,h,lo){const n=document.createElement('canvas');n.width=w;n.height=h;const g=n.getContext('2d');const im=g.createImageData(w,h);for(let i=0;i<w*h;i++){const v=lo+R()*(255-lo);im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}g.putImageData(im,0,0);return n;}
+function paper(){x.fillStyle=P;x.fillRect(0,0,1920,1080);x.save();x.globalCompositeOperation='multiply';[[48,27,.22,228],[1920,1080,.30,212]].forEach(([w,h,a,lo])=>{x.globalAlpha=a;x.drawImage(noise(w,h,lo),0,0,1920,1080)});x.restore();
+  x.strokeStyle='rgba(30,34,28,.045)';x.lineWidth=1;for(let i=40;i<1920;i+=40){x.beginPath();x.moveTo(i+.5,0);x.lineTo(i+.5,1080);x.stroke();}for(let i=40;i<1080;i+=40){x.beginPath();x.moveTo(0,i+.5);x.lineTo(1920,i+.5);x.stroke();}}
+function head(eb,h,sub){T(eb,110,112,{s:22,w:600,c:MUTE,ls:4});T(h,108,186,{s:64,w:650,ls:-1.5});if(sub)T(sub,112,232,{s:24,c:MUTE});}
+function foot(t){T(t,110,1040,{s:18,c:MUTE});}
+// 液态：先在离屏用模糊画「墨团」，再按阈值切出硬边 —— 墨滴之间会长出颈部，像液体融合
+function goo(draw,color,blur=9,th=120){const o=document.createElement('canvas');o.width=1920;o.height=1080;const g=o.getContext('2d');g.filter=`blur(${blur}px)`;g.fillStyle='#000';g.strokeStyle='#000';draw(g);g.filter='none';
+  const im=g.getImageData(0,0,1920,1080),d=im.data;const [r,gg,b]=[1,3,5].map(i=>parseInt(color.slice(i,i+2),16));
+  for(let i=0;i<d.length;i+=4){const a=d[i+3];if(a>th){d[i]=r;d[i+1]=gg;d[i+2]=b;d[i+3]=Math.min(255,(a-th)*6);}else d[i+3]=0;}g.putImageData(im,0,0);x.drawImage(o,0,0);}
+// 轴（全片共用的「刻度」）
+const STG=[['员工提出',170],['团队长审核',560],['部门评估',960],['开发',1180],['上线',1400],['推广',1620],['效果',1840]];
+function axis(mode='now',y=330){x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(170,y);x.lineTo(1840,y);x.stroke();
+  STG.forEach(([n,X],i)=>{const on=i<3||mode==='full';const a=X>1800?'right':'center';
+    x.fillStyle=on?YE:P;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(X,y,8,0,7);x.fill();x.stroke();
+    T(n,X,y-30,{s:24,w:on?650:450,a,c:on?INK:MUTE});
+    if(i>=3)T(mode==='full'?['方案 · 资源','跟踪上线','推广使用','验证效果'][i-3]:'无记录',X,y+36,{s:19,c:OR4,a,w:mode==='full'?600:400});});}
+// 米纳德流线：40 根线，前 8 根通过
+const N=40,Y0=430,GAP=9;
+function cub(p0,p1,p2,p3,g=x){g.beginPath();g.moveTo(...p0);g.bezierCurveTo(...p1,...p2,...p3);}
+function flow({x0=170,passTo=960,fadeRej=1,breakDots=true,solidTo=null}={}){
+  for(let i=N-1;i>=0;i--){const y=Y0+i*GAP,pass=i<8;x.lineWidth=pass?2.2:1.3;x.strokeStyle=pass?OR:GR;x.globalAlpha=pass?1:.72*fadeRej;
+    x.beginPath();x.moveTo(x0,y);x.lineTo(560,y);x.stroke();
+    if(pass){const ty=578+i*6;cub([560,y],[740,y],[760,ty],[960,ty]);x.stroke();
+      if(solidTo){x.beginPath();x.moveTo(960,ty);x.lineTo(solidTo,ty);x.stroke();}}
+    else if(fadeRej>0){const k=i-8,ey=760+k*11,ex=1150+k*14;cub([560,y],[700,y],[760+k*4,ey-80],[ex,ey+60]);x.stroke();}}
+  x.globalAlpha=1;
+  if(breakDots&&!solidTo)for(let i=0;i<8;i++){const y=578+i*6;for(let X=968;X<1860;X+=14){const f=(X-968)/900;x.globalAlpha=Math.max(0,1-f);x.fillStyle=OR;x.beginPath();x.arc(X,y,1.4*(1-f*.6),0,7);x.fill();}}
+  x.globalAlpha=1;}
+
+paper();
+
+/* 1 · 点：1500 个工具，日活 200+ */
+if(S===1){head('现状 · 我们有什么','1500+ 个智能工具','一个点 = 一个工具。墨色实心的点，是每天有人在用的。');
+  const cols=50,rows=30,sx=760,sy=330,gp=21;const act=new Set();while(act.size<200)act.add(Math.floor(R()*cols*rows));
+  for(let r=0;r<rows;r++)for(let k=0;k<cols;k++){const i=r*cols+k,X=sx+k*gp,Y=sy+r*gp;x.fillStyle=act.has(i)?INK:'rgba(110,120,86,.38)';x.beginPath();x.arc(X,Y,act.has(i)?3.6:2.6,0,7);x.fill();}
+  T('日活 200+',110,420,{s:72,w:250,ls:-2});T('其余多数只在一个场景里用过',112,462,{s:24,c:'#55574D'});T('难复制、难推广，与主流程脱节。',112,496,{s:24,c:'#55574D'});
+  T('1000+',110,640,{s:72,w:250,ls:-2});T('名经总部数科认证的数字化专才',112,682,{s:24,c:'#55574D'});T('人均一个工具。',112,716,{s:24,c:'#55574D'});
+  // 注记线指向一个墨点
+  x.strokeStyle=INK;x.lineWidth=1.2;x.globalAlpha=.55;x.beginPath();x.moveTo(470,402);x.lineTo(740,402);x.lineTo(760+21*4,330+21*3);x.stroke();x.globalAlpha=1;
+  foot('数据：1500+ 智能工具、日活 200+、1000+ 认证数字化专才（议题材料）。');}
+
+/* 2 · 点汇成线（液态） */
+if(S===2){head('需求从哪来','点，汇成了线。','800+ 条业务需求。一根线 = 20 条需求，一共 40 根。');
+  for(let i=0;i<N;i++){const y=Y0+i*GAP;x.strokeStyle=i<8?OR:GR;x.globalAlpha=i<8?1:.72;x.lineWidth=i<8?2.2:1.3;x.beginPath();x.moveTo(170,y);x.lineTo(760,y);x.stroke();}
+  x.globalAlpha=1;
+  // 右侧：散落的点被「吸」向各自的轨道，越靠近线头越拉长、越融合
+  goo(g=>{for(let i=0;i<N;i++){const y=Y0+i*GAP;
+      g.lineWidth=2.4;g.beginPath();g.moveTo(752,y);g.lineTo(790,y);g.stroke();
+      for(let k=0;k<16;k++){const t=k/15;const X=796+Math.pow(t,1.5)*1000+k*8+(R()-.3)*t*90+((i*37)%29)*t*2.2;const off=Math.sin(i*1.7+k*2.3)*t*t*70;const r=1.6+(1-t)*1.2;
+        g.beginPath();g.ellipse(X,y+off,r*(1+(1-t)*2.4),r,0,0,7);g.fill();}}},INK,1.6,118);
+  T('800+',150,412,{s:54,w:250,ls:-2});T('条业务需求',300,410,{s:22,c:MUTE});
+  T('散落的点，被各自的轨道吸住，融合成线',1240,330,{s:22,c:MUTE});
+  foot('数据：800+ 条业务需求（议题材料）。');}
+
+/* 3 · 需求的去向（米纳德） */
+if(S===3){head('需求的去向','800 多条需求，去了哪里？','每一根线 = 20 条需求');axis('now');flow();
+  T('800+',150,412,{s:54,w:250,ls:-2});T('40 根线',290,410,{s:20,c:MUTE});
+  T('评审通过 20%',980,532,{s:20,c:MUTE});T('约 160 · 8 根',980,560,{s:30,w:450,c:OR4});
+  T('约 640 · 32 根',1300,1000,{s:30,w:350,c:GR});T('未通过——背后的问题，没有被记录',1300,1036,{s:20,c:MUTE});
+  T('评估之后，线就断成了点。',1180,700,{s:36,w:650});T('开发了没有、上线了没有、效果如何，都没有数字。',1182,744,{s:22,c:'#55574D'});}
+
+/* 4 · 断点特写（液态断开）+ 全片唯一静止 */
+if(S===4){const ys=[...Array(8)].map((_,i)=>250+i*44);
+  x.strokeStyle=OR;x.lineWidth=7;x.lineCap='round';ys.forEach(y=>{x.beginPath();x.moveTo(-20,y);x.lineTo(880,y);x.stroke();});
+  goo(g=>{ys.forEach((y,i)=>{g.lineWidth=13;g.beginPath();g.moveTo(860,y);g.lineTo(930,y);g.stroke();
+      // 线头鼓成水滴、拉出细颈，再脱落成越来越小的墨滴
+      g.beginPath();g.ellipse(958,y,26,11,0,0,7);g.fill();
+      for(let k=0;k<11;k++){const X=1010+k*(46+k*7)+(i%3)*6;const r=Math.max(2.2,10.5-k*.85);g.beginPath();g.arc(X,y+Math.sin(k*1.3+i)*(k*1.2),r,0,7);g.fill();}});},OR,7,110);
+  x.strokeStyle=INK;x.lineWidth=1.3;x.setLineDash([5,7]);x.beginPath();x.moveTo(940,150);x.lineTo(940,640);x.stroke();x.setLineDash([]);
+  T('部门评估',956,176,{s:26,w:650});T('过了这里，就没有记录了',956,206,{s:20,c:MUTE});
+  T('审批只回答「做不做」，',110,800,{s:66,w:650,ls:-1.5});T('没有人对「做成没有」负责。',110,892,{s:66,w:650,ls:-1.5});
+  T('这一拍，画面完全静止。',112,950,{s:22,c:MUTE});}
+
+/* 5 · 3+1 与责任括线 */
+if(S===5){head('接下来 · 先有人，再有路','3 + 1，从头负责到效果');axis('now');flow({fadeRej:.25});
+  // 责任括线：在轴上方，从员工提出一路到效果
+  x.strokeStyle=INK;x.lineWidth=1.4;x.beginPath();x.moveTo(170,268);x.lineTo(170,258);x.lineTo(1840,258);x.lineTo(1840,268);x.stroke();
+  T('责任范围：从需求发生，一路到效果',1005,246,{s:22,w:600,a:'center'});
+  // 4 根铅垂线：前线 3（墨）职能 1（橙），立在流线上方
+  [[300,INK,'前线'],[360,INK,'前线'],[420,INK,'前线'],[500,OR,'职能']].forEach(([X,col,n],k)=>{x.strokeStyle=col;x.lineWidth=1.6;x.beginPath();x.moveTo(X,342);x.lineTo(X,420);x.stroke();
+    x.fillStyle=col;x.beginPath();x.arc(X,342,7,0,7);x.fill();T(n,X,850+(k%2)*0,{s:1,c:P});});
+  x.fillStyle='rgba(244,241,234,.92)';x.fillRect(100,790,1000,200);
+  T('前线 3 人',110,830,{s:30,w:650});T('把一线反馈理成问题，判断值不值得做、怎么做，明确方案。',112,868,{s:22,c:'#55574D'});
+  T('职能 1 人',110,930,{s:30,w:650,c:OR4});T('业管 · 综管 · 财企：审核需求，为它争取资源。',112,968,{s:22,c:'#55574D'});
+  T('4 个人，对同一个结果负责。',1180,700,{s:36,w:650});}
+
+/* 6 · 同一个根因，改多深（第四格液态汇面） */
+if(S===6){head('评审 · 先归因','同一个根因，改多深？','以前只有「过 / 不过」，过了基本就是一个点。现在按根因选深度：点、线、面。');
+  const DP=[[-120,-70],[-40,-140],[80,-110],[140,10],[60,120],[-80,110],[-150,20]];
+  ['不做','单点优化','全链路优化','流程重塑'].forEach((n,k)=>{const cx=330+k*420,cy=560;
+    if(k===3)goo(g=>{DP.forEach(([a,b])=>{g.beginPath();g.arc(cx+a,cy+b,46,0,7);g.fill();});g.beginPath();g.arc(cx,cy,90,0,7);g.fill();},'#F7E6D2',22,90);
+    DP.forEach(([a,b],i)=>{x.strokeStyle=k===0?'rgba(139,140,128,.5)':'rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(cx,cy);x.quadraticCurveTo(cx+a/2+(i%2?14:-14),cy+b/2,cx+a,cy+b);x.stroke();});
+    if(k===2){x.strokeStyle=OR;x.lineWidth=4;x.lineCap='round';x.beginPath();[0,1,2,3,4].forEach((i,j)=>{const [a,b]=DP[i];j?x.lineTo(cx+a,cy+b):x.moveTo(cx+a,cy+b)});x.stroke();}
+    DP.forEach(([a,b],i)=>{let col=GR,r=7;if(k===0)col='#B3B8A2';if(k===1&&i===2){col=OR;r=15;}if(k===2&&i<5)col=OR;if(k===3)col=OR4;x.fillStyle=col;x.beginPath();x.arc(cx+a,cy+b,r,0,7);x.fill();});
+    x.fillStyle=P;x.strokeStyle=k===0?MUTE:INK;x.lineWidth=2;x.fillRect(cx-9,cy-9,18,18);x.strokeRect(cx-9,cy-9,18,18);
+    if(k===0){x.strokeStyle=MUTE;x.lineWidth=1.5;x.beginPath();x.moveTo(cx-30,cy+30);x.lineTo(cx+30,cy-30);x.stroke();}
+    T(n,cx-150,800,{s:38,w:650,c:k===0?MUTE:INK});T(['判断后不投入','· 点','· 线','· 面'][k],cx-148,840,{s:24,w:600,c:k===0?MUTE:OR4});});
+  x.strokeStyle='rgba(30,34,28,.3)';x.lineWidth=1;x.beginPath();x.moveTo(180,300);x.lineTo(1760,300);x.stroke();x.beginPath();x.moveTo(1748,293);x.lineTo(1762,300);x.lineTo(1748,307);x.stroke();T('改动深度',1760,284,{s:20,c:MUTE,a:'right'});
+  x.fillStyle=GR;x.beginPath();x.arc(118,930,7,0,7);x.fill();T('一条需求',134,938,{s:20,c:MUTE});x.strokeStyle=INK;x.lineWidth=2;x.strokeRect(244,921,16,16);T('同一个根因',270,938,{s:20,c:MUTE});}
+
+/* 7 · 补全：点重新融合成实线 */
+if(S===7){head('评估之后','这一次，线没有断。','方案和落地计划先定下来，资源同步争取；每一段都有人跟、有数字。');axis('full');
+  flow({fadeRej:.25,breakDots:false,solidTo:1500});
+  // 1500 之后：墨滴正在融合回线（液态桥接）
+  goo(g=>{g.beginPath();g.ellipse(1520,599,26,26,0,0,7);g.fill();g.lineWidth=40;g.beginPath();g.moveTo(1480,599);g.lineTo(1520,599);g.stroke();
+    for(let k=0;k<9;k++){const X=1570+k*(30+k*5);const r=Math.max(4,16-k*1.3);g.beginPath();g.arc(X,599+Math.sin(k)*6,r,0,7);g.fill();}},OR,9,110);
+  // 汇流头之前，8 根线已重新连上
+  T('点正在融回线里',1560,660,{s:20,c:OR4,w:500});
+  T('约 160',980,560,{s:30,w:450,c:OR4});
+  [['开发',1180],['上线',1400]].forEach(([n,X])=>{x.strokeStyle=OR;x.lineWidth=1;x.setLineDash([2,4]);x.beginPath();x.moveTo(X,345);x.lineTo(X,570);x.stroke();x.setLineDash([]);});
+  T('断开的点，重新融成了线。',1180,720,{s:36,w:650});T('开发 · 上线 · 推广 · 效果：每一段都有记录。',1182,764,{s:22,c:'#55574D'});}
+
+/* 8 · 沉淀成面，再流回起点 */
+if(S===8){head('总结 · 沉淀','做成的方案，沉下来。','下一个相似的问题，不必从头开始；供给留下的经验，让前线把问题提得更准。');axis('full');
+  flow({fadeRej:.15,breakDots:false,solidTo:1840});
+  // 线在终点向下汇入一池（液态），沉成三层面
+  goo(g=>{for(let i=0;i<8;i++){const ty=578+i*6;g.lineWidth=3.2;g.beginPath();g.moveTo(1790,ty);g.bezierCurveTo(1830+i*2,ty,1820+i*3,760,1760+i*4,900);g.stroke();}
+    g.lineWidth=26;g.beginPath();g.moveTo(1770,860);g.lineTo(1770,905);g.stroke();},OR,5,110);
+  [[0,'#F7E6D2'],[1,'#F2C27E'],[2,'#E57A32']].forEach(([k,col])=>{x.fillStyle=col;x.beginPath();x.moveTo(1240,904+k*30);for(let X=1240;X<=1940;X+=10)x.lineTo(X,904+k*30+Math.sin(X/70+k*1.4)*4*(1-k*.25));x.lineTo(1940,1080);x.lineTo(1240,1080);x.closePath();x.fill();});
+  // 一根细线流回起点
+  x.strokeStyle=OR;x.lineWidth=2.4;x.beginPath();x.moveTo(1240,990);x.bezierCurveTo(900,1000,300,1010,190,940);x.bezierCurveTo(140,900,150,700,170,470);x.stroke();
+  x.fillStyle=OR;x.beginPath();x.moveTo(162,482);x.lineTo(170,462);x.lineTo(178,482);x.closePath();x.fill();
+  T('沉淀的方案（一层一层的面）',1270,880,{s:24,w:650,c:OR4});T('流回起点：接住下一个问题',600,980,{s:22,c:OR4,w:500});}
+
+/* 9 · 全图：从点，到线，到面 */
+if(S===9){x.save();x.translate(520,20);x.scale(.72,.72);
+  axis('full');flow({fadeRej:.55,breakDots:false,solidTo:1840});
+  for(let i=0;i<8;i++){const ty=578+i*6;x.strokeStyle=OR;x.lineWidth=2.2;x.beginPath();x.moveTo(1830,ty);x.bezierCurveTo(1870,ty,1860,760,1800,880);x.stroke();}
+  [[0,'#F7E6D2'],[1,'#F2C27E'],[2,'#E57A32']].forEach(([k,col])=>{x.fillStyle=col;x.beginPath();x.moveTo(1340,880+k*36);for(let X=1340;X<=1900;X+=10)x.lineTo(X,880+k*36+Math.sin(X/70+k*1.4)*4);x.lineTo(1900,1000+k*0+60);x.lineTo(1340,1060);x.closePath();x.fill();});
+  x.strokeStyle=OR;x.lineWidth=3;x.beginPath();x.moveTo(1340,1000);x.bezierCurveTo(900,1060,300,1060,190,960);x.bezierCurveTo(140,900,150,700,170,470);x.stroke();
+  x.strokeStyle=INK;x.lineWidth=1.6;x.beginPath();x.moveTo(170,268);x.lineTo(170,258);x.lineTo(1840,258);x.lineTo(1840,268);x.stroke();
+  [[300,INK],[340,INK],[380,INK],[440,OR]].forEach(([X,col])=>{x.strokeStyle=col;x.lineWidth=2;x.beginPath();x.moveTo(X,342);x.lineTo(X,420);x.stroke();x.fillStyle=col;x.beginPath();x.arc(X,342,8,0,7);x.fill();});
+  x.restore();
+  // 左：点阵缩影
+  for(let r=0;r<16;r++)for(let k=0;k<14;k++){x.fillStyle=(r*14+k)%7===0?INK:'rgba(110,120,86,.38)';x.beginPath();x.arc(140+k*20,350+r*20,2.4,0,7);x.fill();}
+  T('点',140,320,{s:26,w:650});T('线',700,320,{s:26,w:650});T('面',1580,740,{s:26,w:650});
+  T('从点，到线，到面。',108,900,{s:92,w:650,ls:-2});T('议题三 · 从「工具应用」走向「模式创新」',112,960,{s:26,c:MUTE});
+  x.fillStyle=GR;x.fillRect(112,996,40,6);T('现在已在做 / 未通过',162,1004,{s:20,c:MUTE});x.fillStyle=OR;x.fillRect(392,996,40,6);T('通过 · 补全',442,1004,{s:20,c:MUTE});}
+
+window.__ready=true;
+})();
+</script></body></html>
