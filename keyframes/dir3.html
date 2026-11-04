@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><title>三方向 · 同一帧</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#EEE8DA}canvas{display:block}</style></head>
+<body><canvas id="c" width="1920" height="1080"></canvas>
+<script>
+(async()=>{
+await document.fonts.load('600 80px "MiSans VF"','800多条需求去了哪里约通过未通过员工提出团队长审核部门评估开发上线推广效果无记录每条线业务需求的去向');
+const D=new URLSearchParams(location.search).get('d')||'A';
+const c=document.getElementById('c'),x=c.getContext('2d');
+let sd=3;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const F=(w,s)=>`${w} ${s}px "MiSans VF"`;
+function text(t,X,Y,o={}){x.save();x.font=F(o.w||400,o.s||24);x.fillStyle=o.c||'#1A1A17';x.textAlign=o.a||'left';x.textBaseline=o.b||'alphabetic';
+  if(o.ls)x.letterSpacing=o.ls+'px';if(o.rot){x.translate(X,Y);x.rotate(o.rot);x.fillText(t,0,0);}else x.fillText(t,X,Y);x.restore();}
+// 纸：多尺度噪声叠出纤维与斑驳
+function noiseCanvas(w,h,a,lo=0){const n=document.createElement('canvas');n.width=w;n.height=h;const g=n.getContext('2d');const im=g.createImageData(w,h);
+  for(let i=0;i<w*h;i++){const v=lo+R()*(255-lo);im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=a;}g.putImageData(im,0,0);return n;}
+function paper(base,amt=1){x.fillStyle=base;x.fillRect(0,0,1920,1080);x.save();x.imageSmoothingEnabled=true;
+  [[48,27,.35,225],[480,270,.30,200],[1920,1080,.45,205]].forEach(([w,h,a,lo])=>{x.globalAlpha=a*amt;x.globalCompositeOperation='multiply';x.drawImage(noiseCanvas(w,h,255,lo),0,0,1920,1080);});
+  x.restore();}
+// 丝网墨色不匀：在已画形状上叠一层浅色噪声
+function inkTexture(alpha=.18){x.save();x.globalCompositeOperation='source-atop';x.globalAlpha=alpha;x.drawImage(noiseCanvas(160,90,255),0,0,1920,1080);x.globalAlpha=alpha*.6;x.drawImage(noiseCanvas(960,540,255),0,0,1920,1080);x.restore();}
+function layer(draw,alpha=.18){const off=document.createElement('canvas');off.width=1920;off.height=1080;const o=off.getContext('2d');const keep=x;
+  return {off,o};}
+
+/* ───────────── A · 包豪斯丝网版画 ───────────── */
+if(D==='A'){
+  const P='#EDE6D6',INK='#1A1A17',OR='#E8742A',YE='#EDB33B',GR='#3F5B3A',GR2='#8E9A7A';
+  paper(P,.8);
+  const L=document.createElement('canvas');L.width=1920;L.height=1080;const o=L.getContext('2d');const save=x;
+  // 在离屏上画全部色块，再整体做墨色不匀，模拟丝网
+  function shapes(g,dx=0,dy=0,mono=null){
+    // 未通过的 640：一大块深绿半圆，沉到画面下沿
+    g.fillStyle=mono||GR;g.beginPath();g.arc(820+dx,1080+dy,330,Math.PI,2*Math.PI);g.fill();
+    // 800+：一只大橙圆
+    g.fillStyle=mono||OR;g.beginPath();g.arc(350+dx,680+dy,300,0,Math.PI*2);g.fill();
+    // 评审：黄色楔形收窄到 20%
+    g.fillStyle=mono||YE;g.beginPath();g.moveTo(560+dx,450+dy);g.lineTo(1000+dx,566+dy);g.lineTo(1000+dx,642+dy);g.lineTo(560+dx,910+dy);g.closePath();g.fill();
+    // 约 160：小橙圆
+    g.fillStyle=mono||OR;g.beginPath();g.arc(1046+dx,604+dy,40,0,Math.PI*2);g.fill();
+    // 部门评估：一根粗黑杆＝闸口
+    g.fillStyle=mono||INK;g.fillRect(992+dx,240+dy,16,700);
+  }
+  shapes(o);
+  o.globalCompositeOperation='source-atop';o.globalAlpha=.10;o.drawImage(noiseCanvas(240,135,255,120),0,0,1920,1080);o.globalAlpha=.14;o.drawImage(noiseCanvas(1920,1080,255,140),0,0,1920,1080);
+  // 套色错位：先压一层浅色偏移版，再压正版
+  x.globalAlpha=.16;x.save();x.translate(5,4);shapes(x,0,0,'#B65A1E');x.restore();x.globalAlpha=1;
+  x.drawImage(L,0,0);
+  // 评估之后：细线 + 空心圆＝无记录
+  x.strokeStyle=INK;x.lineWidth=2;x.setLineDash([2,12]);x.lineCap='round';x.beginPath();x.moveTo(1100,604);x.lineTo(1880,604);x.stroke();x.setLineDash([]);
+  [['开发',1240],['上线',1420],['推广',1600],['效果',1780]].forEach(([n,X],i)=>{x.lineWidth=3;x.strokeStyle=INK;x.fillStyle=P;x.beginPath();x.arc(X,604,20,0,Math.PI*2);x.fill();x.stroke();
+    text(n,X,560,{s:26,w:600,a:'center'});text('无记录',X,672,{s:20,c:'#7B756A',a:'center'});text('?',X,612,{s:24,w:300,a:'center',c:'#7B756A'});});
+  // 字
+  text('需求的去向',110,118,{s:22,w:600,c:'#7B756A',ls:4});
+  text('800 多条需求，',110,206,{s:76,w:700,ls:-2});text('去了哪里？',110,296,{s:76,w:700,ls:-2});
+  text('800',350,710,{s:170,w:300,c:P,a:'center',ls:-8});text('+ 条业务需求',350,782,{s:28,w:500,c:P,a:'center'});
+  text('团队长审核',580,430,{s:24,w:600});
+  text('部门评估',1024,262,{s:26,w:700});
+  text('约 160',1100,470,{s:44,w:300});text('评审通过 20%',1102,502,{s:20,w:500,c:'#7B756A'});
+  text('约 640 未通过',820,860,{s:34,w:300,c:P,a:'center'});text('背后的问题没有被记录',820,898,{s:20,c:'#DCD6C6',a:'center'});
+  text('A · 包豪斯丝网版画',1810,1030,{s:22,w:600,a:'right',c:'#7B756A'});
+}
+
+/* ───────────── B · 瑞士线描（每条线 = 20 条需求） ───────────── */
+if(D==='B'){
+  const P='#F4F1EA',INK='#1E221C',OR='#E57A32',YE='#EDB33B',GR='#6E7856';
+  paper(P,.7);
+  x.strokeStyle='rgba(30,34,28,.05)';x.lineWidth=1;for(let i=40;i<1920;i+=40){x.beginPath();x.moveTo(i+.5,0);x.lineTo(i+.5,1080);x.stroke();}for(let i=40;i<1080;i+=40){x.beginPath();x.moveTo(0,i+.5);x.lineTo(1920,i+.5);x.stroke();}
+  const N=40,Y0=430,GAP=9;
+  const cub=(p0,p1,p2,p3)=>{x.beginPath();x.moveTo(...p0);x.bezierCurveTo(...p1,...p2,...p3);};
+  for(let i=0;i<N;i++){const y=Y0+i*GAP;const pass=i<8;
+    x.lineWidth=pass?2.2:1.3;x.strokeStyle=pass?OR:GR;x.globalAlpha=pass?1:.75;
+    x.beginPath();x.moveTo(170,y);x.lineTo(560,y);x.stroke();
+    if(pass){const ty=578+i*6;cub([560,y],[740,y],[760,ty],[960,ty]);x.stroke();}
+    else{const k=i-8;const ey=760+k*11,ex=1150+k*14;x.globalAlpha=.75;cub([560,y],[700,y],[760+k*4,ey-80],[ex,ey+60]);x.stroke();
+      // 末端渐隐
+      const g=x.createLinearGradient(ex,0,ex+120,0);g.addColorStop(0,'rgba(110,120,86,.75)');g.addColorStop(1,'rgba(110,120,86,0)');x.strokeStyle=g;cub([ex,ey+60],[ex+40,ey+75],[ex+80,ey+85],[ex+130,ey+92]);x.stroke();}
+  }
+  x.globalAlpha=1;
+  // 评估之后：8 条线变成点
+  for(let i=0;i<8;i++){const y=578+i*6;for(let X=966;X<1860;X+=14){x.globalAlpha=Math.max(0,1-(X-966)/900);x.fillStyle=OR;x.beginPath();x.arc(X,y,1.3,0,Math.PI*2);x.fill();}}
+  x.globalAlpha=1;
+  // 轴
+  x.strokeStyle='rgba(30,34,28,.35)';x.lineWidth=1;x.beginPath();x.moveTo(170,330);x.lineTo(1860,330);x.stroke();
+  [['员工提出',170,1],['团队长审核',560,1],['部门评估',960,1],['开发',1180,0],['上线',1400,0],['推广',1620,0],['效果',1840,0]].forEach(([n,X,on])=>{
+    x.fillStyle=on?YE:P;x.strokeStyle=INK;x.lineWidth=1.5;x.beginPath();x.arc(X,330,8,0,Math.PI*2);x.fill();x.stroke();
+    text(n,X,300,{s:24,w:on?650:450,a:X>1800?'right':'center',c:on?INK:'#8B8C80'});if(!on)text('无记录',X,366,{s:19,c:'#B4521F',a:X>1800?'right':'center'});
+    if(on){x.strokeStyle='rgba(30,34,28,.18)';x.setLineDash([3,5]);x.beginPath();x.moveTo(X,340);x.lineTo(X,960);x.stroke();x.setLineDash([]);}});
+  text('需求的去向',110,118,{s:22,w:600,c:'#8B8C80',ls:4});text('800 多条需求，去了哪里？',110,196,{s:68,w:650,ls:-1.5});
+  text('每一根线 = 20 条需求',112,244,{s:24,c:'#8B8C80'});
+  text('800+',150,412,{s:54,w:250,ls:-2,a:'left'});text('40 根线',290,410,{s:20,c:'#8B8C80'});
+  text('约 160 · 8 根',980,560,{s:30,w:450,c:'#B4521F'});text('评审通过 20%',980,532,{s:20,c:'#8B8C80'});
+  text('约 640 · 32 根',1300,1000,{s:30,w:350,c:GR});text('未通过——背后的问题，没有被记录',1300,1036,{s:20,c:'#8B8C80'});
+  text('评估之后，线就断成了点。',1180,700,{s:36,w:650});text('开发了没有、上线了没有、效果如何，都没有数字。',1182,744,{s:22,c:'#55574D'});
+  text('B · 瑞士线描',1810,1030,{s:22,w:600,a:'right',c:'#8B8C80'});
+}
+
+/* ───────────── C · 马蒂斯剪纸（橘叶与果皮） ───────────── */
+if(D==='C'){
+  const P='#F2EBDD',INK='#2A2420',OR='#E8742A',YE='#EFBE45',GR='#3E5A34',GR2='#7F8F4E';
+  paper(P,.8);
+  // 剪刀折线：沿轮廓取点加抖动
+  function cut(pts,j=2.2){return pts.map(([a,b])=>[a+(R()-.5)*j*2,b+(R()-.5)*j*2]);}
+  function poly(pts,fill,shadow=true){x.save();if(shadow){x.shadowColor='rgba(70,45,20,.28)';x.shadowOffsetX=5;x.shadowOffsetY=6;x.shadowBlur=5;}
+    x.fillStyle=fill;x.beginPath();pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.closePath();x.fill();x.restore();}
+  function sample(fn,a,b,n){const r=[];for(let i=0;i<=n;i++){const t=a+(b-a)*i/n;r.push(fn(t));}return r;}
+  // 一枚橘叶：两条弧围成，带叶柄的小翼
+  function leaf(cx,cy,len,wid,ang,fill){const pts=[];for(let i=0;i<=24;i++){const t=i/24;pts.push([t*len,Math.sin(t*Math.PI)*wid*(1-.25*t)]);}
+    for(let i=24;i>=0;i--){const t=i/24;pts.push([t*len,-Math.sin(t*Math.PI)*wid*(1-.25*t)]);}
+    const ca=Math.cos(ang),sa=Math.sin(ang);poly(cut(pts.map(([a,b])=>[cx+a*ca-b*sa,cy+a*sa+b*ca]),1.6),fill);}
+  // 大橙圆：一只橘子的剖面感（只取圆和几道浅色瓣线）
+  poly(cut(sample(t=>[330+290*Math.cos(t),650+290*Math.sin(t)],0,Math.PI*2,90),2),OR);
+  x.save();x.strokeStyle='rgba(247,230,210,.55)';x.lineWidth=5;for(let k=0;k<10;k++){const a=k*Math.PI/5+.2;x.beginPath();x.moveTo(330,650);x.lineTo(330+240*Math.cos(a),650+240*Math.sin(a));x.stroke();}x.restore();
+  // 叶子簇（一线：问题从这里长出来）
+  [[560,880,220,60,.55,GR],[520,900,180,48,1.2,GR2],[590,850,160,42,-.1,GR],[120,930,190,50,2.6,GR2],[60,420,170,44,-2.2,GR]].forEach(a=>leaf(...a));
+  // 流向：橙黄剪纸带，越往右越窄
+  const top=sample(t=>[600+t*400,400+t*t*0+ (566-400)*Math.pow(t,1.4)],0,1,30), bot=sample(t=>[600+t*400,820-(820-642)*Math.pow(t,1.1)],0,1,30).reverse();
+  poly(cut([...top,...bot],2.4),YE);
+  // 未通过：一条浅绿剪纸带向下弯走、出画
+  const rt=sample(t=>[640+t*520,830+t*t*120],0,1,30),rb=sample(t=>[640+t*470,980+t*t*140],0,1,30).reverse();poly(cut([...rt,...rb],2.4),'#B9C19C');
+  // 约 160：小橙圆
+  poly(cut(sample(t=>[1046+40*Math.cos(t),604+40*Math.sin(t)],0,Math.PI*2,40),1.4),OR);
+  // 评估之后：只剩铅笔虚线和针孔
+  x.strokeStyle='rgba(42,36,32,.55)';x.lineWidth=1.6;x.setLineDash([3,10]);x.beginPath();x.moveTo(1092,586);x.bezierCurveTo(1300,580,1600,560,1880,540);x.stroke();x.beginPath();x.moveTo(1092,622);x.bezierCurveTo(1300,628,1600,648,1880,668);x.stroke();x.setLineDash([]);
+  [['开发',1250],['上线',1440],['推广',1630],['效果',1810]].forEach(([n,X])=>{x.fillStyle='rgba(42,36,32,.75)';x.beginPath();x.arc(X,604,4,0,Math.PI*2);x.fill();text(n,X,520,{s:26,w:600,a:'center',c:INK});text('无记录',X,700,{s:20,c:'#9A8A74',a:'center'});});
+  // 部门评估：一枚黑色剪纸细条
+  poly(cut([[1000,250],[1014,250],[1014,940],[1000,940]],1.2),INK);
+  text('需求的去向',110,118,{s:22,w:600,c:'#9A8A74',ls:4});text('800 多条需求，',110,206,{s:76,w:700,ls:-2,c:INK});text('去了哪里？',110,296,{s:76,w:700,ls:-2,c:INK});
+  text('800',330,690,{s:150,w:300,c:'#FBF4EA',a:'center',ls:-6});text('+ 条业务需求',330,750,{s:26,w:500,c:'#FBF4EA',a:'center'});
+  text('部门评估',1028,272,{s:26,w:700,c:INK});text('约 160',1100,420,{s:44,w:300,c:INK});text('评审通过 20%',1102,452,{s:20,w:500,c:'#9A8A74'});
+  text('约 640 未通过',1180,1000,{s:30,w:400,c:'#5C6B44'});text('背后的问题，没有被记录',1180,1034,{s:20,c:'#9A8A74'});
+  text('C · 马蒂斯剪纸',1810,1030,{s:22,w:600,a:'right',c:'#9A8A74'});
+}
+window.__ready=true;
+})();
+</script></body></html>
