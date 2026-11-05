@@ -1,0 +1,17 @@
+{
+  "name": "yiti3-film",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "python3 tools/build.py",
+    "music": "python3 tools/music.py",
+    "dev": "npx --yes hyperframes@0.9.15 preview",
+    "check": "npx --yes hyperframes@0.9.15 check",
+    "snapshot": "npx --yes hyperframes@0.9.15 snapshot --at 3,15,30,47,65,84",
+    "render": "npx --yes hyperframes@0.9.15 render -q looks -o renders/议题三.mp4",
+    "film": "npm run sync && npm run music && npm run check && npm run render"
+  },
+  "dependencies": {
+    "gsap": "^3.15.0"
+  }
+}
