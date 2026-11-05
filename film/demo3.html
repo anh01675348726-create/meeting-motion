@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>议题三 · demo</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#FBF8F0;overflow:hidden}
+svg{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+text{font-family:"MiSans VF","PingFang SC","Microsoft YaHei",sans-serif;fill:#22301F}
+#bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:min(420px,46vw);height:26px;cursor:pointer;transition:opacity .5s;touch-action:none}
+#trk{position:absolute;left:0;right:0;top:12px;height:2px;border-radius:2px;background:rgba(34,48,31,.16)}
+#fil{height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#56964A,#A8B234,#F6BE2C,#F27026)}
+#thumb{position:absolute;top:13px;left:0;transform:translate(-50%,-50%);font:700 11px "MiSans VF","PingFang SC",sans-serif;letter-spacing:1px;color:#FBF8F0;background:#22301F;border-radius:999px;padding:3px 8px 3px 9px;white-space:nowrap}
+.idle #bar{opacity:0;pointer-events:none}
+</style></head>
+<body>
+<svg id="s" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet">
+<defs>
+  <linearGradient id="metal" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="260" y2="160" spreadMethod="reflect">
+    <stop offset="0" stop-color="#B4521F"/><stop offset=".32" stop-color="#F27026"/><stop offset=".58" stop-color="#F6BE2C"/><stop offset=".74" stop-color="#FFF1C6"/><stop offset=".86" stop-color="#F6BE2C"/><stop offset="1" stop-color="#E0661F"/>
+  </linearGradient>
+  <filter id="goo" x="0" y="0" width="1920" height="1080" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"/>
+  </filter>
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="rgba(34,48,31,.045)"/></pattern>
+</defs>
+<rect width="1920" height="1080" fill="#FBF8F0"/><rect width="1920" height="1080" fill="url(#grid)"/>
+<g id="art"></g>
+<g id="liq" filter="url(#goo)"></g>
+<g id="hi"></g>
+<g id="txt"></g>
+</svg>
+<div id="bar"><div id="trk"><div id="fil"></div></div><div id="thumb">专业</div></div>
+<script>
+const NS='http://www.w3.org/2000/svg',S=document.getElementById('s');
+const ART=document.getElementById('art'),LIQ=document.getElementById('liq'),HI=document.getElementById('hi'),TXT=document.getElementById('txt');
+const INK='#22301F',MUTE='#7E806F',GR='#56964A',OR4='#B4521F';
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,exo=t=>t>=1?1:1-Math.pow(2,-10*t),sm=t=>t*t*(3-2*t);
+// 欠阻尼弹簧：液体金属落定时的回弹
+const spring=(t,w=9,z=.32)=>{if(t<=0)return 0;const q=Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(w*q*t)+z/q*Math.sin(w*q*t));};
+const wob=(t,w=14,z=.22)=>t<=0?0:Math.exp(-z*w*t)*Math.sin(w*t);           // 落地后的形变余震
+function el(tag,a,p){const e=document.createElementNS(NS,tag);for(const k in a)e.setAttribute(k,a[k]);(p||ART).appendChild(e);return e;}
+
+/* ── 文字与线：用「擦出」出现、「擦走」离开，不淡入 ── */
+const ITEMS=[];
+function wipe(e,tIn,tOut,dur=.9){const id='c'+ITEMS.length;const cp=el('clipPath',{id},S.querySelector('defs'));const r=el('rect',{},cp);e.setAttribute('clip-path',`url(#${id})`);ITEMS.push({e,r,tIn,tOut,dur});return e;}
+function T(str,x,y,size,o={},tIn=0,tOut=99){const e=el('text',{x,y,'font-size':size,'font-weight':o.w||400,fill:o.c||INK,'text-anchor':o.a||'start','letter-spacing':o.ls||0},TXT);e.textContent=str;return wipe(e,tIn,tOut,o.d||.8);}
+function L(d,tIn,tOut,o={}){const e=el('path',{d,fill:'none',stroke:o.c||'rgba(34,48,31,.3)','stroke-width':o.w||2,pathLength:1,'stroke-dasharray':'1 1','stroke-dashoffset':1,'stroke-linecap':'round'},o.p||ART);e._L={tIn,tOut,d:o.d||1.2};LINES.push(e);return e;}
+const LINES=[];
+function head(eb,ti,sub,tIn,tOut){T(eb,110,100,24,{w:650,c:OR4,ls:5},tIn,tOut);T(ti,106,178,64,{w:700,ls:-1.5},tIn+.15,tOut);if(sub)T(sub,110,228,28,{c:MUTE},tIn+.35,tOut);}
+
+/* ── 液体金属：所有液滴放在 goo 组里（彼此靠近就融合），用流动的金属渐变填充 ── */
+const POOL=[],HPOOL=[];let np=0,nh=0;
+function blob(){if(!POOL[np])POOL[np]=el('ellipse',{fill:'url(#metal)'},LIQ);const e=POOL[np++];e.style.display='';return e;}
+function rectL(){const e=el('rect',{fill:'url(#metal)'},LIQ);return e;}
+function drop(x,y,r,vx=0,vy=0,sq=0){if(r<=.5)return;const v=Math.hypot(vx,vy),st=clamp(v/1600,0,.55),a=Math.atan2(vy,vx)*180/Math.PI;
+  const e=blob();const rx=r*(1+st)*(1+sq),ry=r*(1-st*.45)*(1-sq*.55);e.setAttribute('cx',x);e.setAttribute('cy',y);e.setAttribute('rx',rx);e.setAttribute('ry',ry);e.setAttribute('transform',v>40?`rotate(${a} ${x} ${y})`:'');
+  if(r>9){if(!HPOOL[nh])HPOOL[nh]=el('ellipse',{fill:'rgba(255,250,232,.8)'},HI);const h=HPOOL[nh++];h.style.display='';h.setAttribute('cx',x-rx*.3);h.setAttribute('cy',y-ry*.42);h.setAttribute('rx',Math.max(1,rx*.28));h.setAttribute('ry',Math.max(.6,ry*.13));h.setAttribute('transform',`rotate(-18 ${x-rx*.3} ${y-ry*.42})`);}}
+// 由位置函数自动求速度，用来做拉伸
+function dropF(f,t,r,sq=0){const a=f(t),b=f(t-1/60);drop(a[0],a[1],r,(a[0]-b[0])*60,(a[1]-b[1])*60,sq);}
+const bez=(p0,p1,p2,p3,u)=>{const v=1-u;return [v*v*v*p0[0]+3*v*v*u*p1[0]+3*v*u*u*p2[0]+u*u*u*p3[0],v*v*v*p0[1]+3*v*v*u*p1[1]+3*v*u*u*p2[1]+u*u*u*p3[1]];};
+// 跳：两点之间抛物线跳过去，落地有回弹
+const hop=(P,Q,t,ta,tb,h=120)=>{const u=eio(win(t,ta,tb));return [lerp(P[0],Q[0],u),lerp(P[1],Q[1],u)-h*4*u*(1-u)];};
+
+/* ═════════ 场 1 · 三个来源 → 问题清单（0–7） ═════════ */
+head('变化 1 · 需求发现','从被动接单，到主动发现问题','真正有价值的问题，往往是员工习以为常、没意识到可以改变的。',.2,6.6);
+const SRC=[['前线提报','员工提报 · 定期访谈 · 使用反馈',380],['经营识别','人工投入 · 件均 · 差错率 · 同业对比',580],['专家巡检','跟着一笔业务，从受理看到交付',780]];
+const INLET=[1240,452];
+SRC.forEach(([a,b,y],i)=>{T(a,150,y,38,{w:700,c:GR},.9+i*.25,6.6);T(b,152,y+44,27,{c:MUTE},1.1+i*.25,6.6);
+  L(`M560 ${y-12} C 900 ${y-12}, 1000 ${INLET[1]-40}, ${INLET[0]-20} ${INLET[1]-30}`,1.0+i*.25,6.6,{c:'rgba(34,48,31,.22)',w:2});});
+const FLASK=[1180,470,120,390];
+const fl=el('path',{d:`M${FLASK[0]} ${FLASK[1]} V ${FLASK[1]+FLASK[3]-20} Q ${FLASK[0]} ${FLASK[1]+FLASK[3]} ${FLASK[0]+20} ${FLASK[1]+FLASK[3]} H ${FLASK[0]+FLASK[2]-20} Q ${FLASK[0]+FLASK[2]} ${FLASK[1]+FLASK[3]} ${FLASK[0]+FLASK[2]} ${FLASK[1]+FLASK[3]-20} V ${FLASK[1]}`,fill:'none',stroke:INK,'stroke-width':2.5,pathLength:1,'stroke-dasharray':'1 1','stroke-dashoffset':1});fl._L={tIn:1.2,tOut:6.6,d:1.2};LINES.push(fl);
+T('问题清单',1350,450,36,{w:700},1.6,6.6);T('统一字段 · 分公司按月汇总',1352,490,24,{c:MUTE},1.8,6.6);
+const FIELDS=['问题来源','涉及业务 / 岗位 / 系统','具体问题','影响范围','发生次数和人工','当前处理方式','诊断负责人','后续状态'];
+const SDROPS=[];SRC.forEach((s,i)=>{for(let k=0;k<3;k++)SDROPS.push({i,t0:1.5+i*.3+k*1.05});});
+const ARR=SDROPS.map(d=>d.t0+1.7);                 // 到达瓶口
+const level=t=>ARR.reduce((s,a)=>s+sm(win(t,a+.25,a+.75)),0)/ARR.length;
+const ARS=[...ARR].sort((a,b)=>a-b);FIELDS.forEach((f,i)=>{T(f,1390,548+i*44,28,{},ARS[Math.min(8,i)]+.3,6.6);});
+const TICKS=FIELDS.map((f,i)=>{const e=el('path',{d:`M1356 ${538+i*44} l6 7 l12 -14`,fill:'none',stroke:'#F27026','stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round',pathLength:1,'stroke-dasharray':'1 1','stroke-dashoffset':1});e._L={tIn:ARS[Math.min(8,i)]+.25,tOut:6.6,d:.35};LINES.push(e);return e;});
+const POOLR=rectL();
+function scene1(t){if(t>8.2)return;
+  SDROPS.forEach((d,k)=>{const y=SRC[d.i][2]-12;const f=tt=>{const u=win(tt,d.t0,d.t0+1.7);if(u<1)return bez([560,y],[900,y],[1000,INLET[1]-40],[INLET[0]-20,INLET[1]-30],eio(u));
+      const g=tt-(d.t0+1.7);const top=FLASK[1]+FLASK[3]-level(tt)*FLASK[3]*.92;return [INLET[0]+ (k%3-1)*14,Math.min(top+6,INLET[1]-30+ 900*g*g+120*g)];};
+    if(t>d.t0&&t<ARR[k]+.8)dropF(f,t,13);});
+  // 液面：瓶里的液体随到达的液滴升高，表面有波
+  const lv=level(t),h=lv*FLASK[3]*.92;const out=eio(win(t,6.6,7.6));
+  if(h>1&&out<1){POOLR.style.display='';POOLR.setAttribute('x',FLASK[0]+6);POOLR.setAttribute('width',FLASK[2]-12);POOLR.setAttribute('y',FLASK[1]+FLASK[3]-6-h*(1-out));POOLR.setAttribute('height',h*(1-out));POOLR.setAttribute('rx',14);}else POOLR.style.display='none';
+  if(t>6.6&&t<8.2){const u=win(t,6.6,7.8);const P=[FLASK[0]+FLASK[2]/2,FLASK[1]+FLASK[3]-h/2];const p=hop(P,[960,300],t,6.6,7.8,160);drop(p[0],p[1],lerp(Math.max(20,h*.4),46,u)*(t>7.8?1:1),0,0,wob(t-7.8)*.4);}
+}
+
+/* ═════════ 场 2 · 往下钻四层（7–14.5）：一滴液体真的往下落，穿过四层地层 ═════════ */
+head('变化 2 · 响应评审','先找根因：往下钻四层','例：员工希望自动整理报表，最终开发了一个自动汇总工具。',7.0,14.4);
+const LAY=[['操作环节','是否重复、复杂、高耗时？','汇总动作耗时——只是表象',380],['业务流程','是否衔接不顺、重复传递？','数据不能直接取，要人工搬运整理',500],['业务规则','是否标准不统一、规则过多？','口径一致，不涉及',620],['生产分工','是否分工不合理？','分工合理，不涉及',740]];
+const BH=110;
+LAY.forEach(([n,q,a,y],i)=>{const r=el('rect',{x:140,y,width:1640,height:BH-6,rx:8,fill:`rgba(86,150,74,${.07+i*.045})`});wipe(r,7.4+i*.15,14.4,1.1);
+  T(n,176,y+52,36,{w:700},7.6+i*.15,14.4);T(q,178,y+90,24,{c:MUTE},7.8+i*.15,14.4);});
+const ANS=[[9.6,0],[11.0,1],[11.9,2],[12.2,3]];
+ANS.forEach(([ta,i])=>{const [n,q,a,y]=LAY[i];T(a,1180,y+66,i===1?30:26,{w:i===1?700:400,c:i===1?OR4:MUTE},ta,14.4);});
+const ROOT=el('rect',{x:140,y:500,width:1640,height:BH-6,rx:8,fill:'none',stroke:'#F27026','stroke-width':3,pathLength:1,'stroke-dasharray':'1 1','stroke-dashoffset':1});ROOT._L={tIn:10.9,tOut:14.4,d:1};LINES.push(ROOT);
+T('根因',1700,488,24,{w:700,c:'#F27026',a:'end'},11.0,14.4);
+T('→ 打通数据来源，取消人工整理环节',960,920,34,{w:700,c:OR4,a:'middle'},12.6,14.4);
+T('不是每个问题都要走完四层，也不是层次越高越好。',960,970,24,{c:MUTE,a:'middle'},13.0,14.4);
+const fall=t=>{ // 7.8 后：落到第一层中间停一下 → 再落到第二层，摊开
+  let y;if(t<8.6)y=300;else if(t<9.0){const g=t-8.6;y=300+1200*g*g;}else if(t<10.0)y=lerp(300+1200*.16,435,spring(t-9.0,10,.35));else if(t<10.3){const g=t-10.0;y=435+1300*g*g;}else y=lerp(435+1300*.09,555,spring(t-10.3,10,.3));
+  return [960,Math.min(y,560)];};
+function scene2(t){if(t<7.8||t>15.4)return;
+  if(t<10.4){const sq=t>9.0&&t<10?wob(t-9.0,13,.25)*.55:0;dropF(fall,t,46,sq);return;}
+  // 落进第二层：摊开成一层「液面」，带余震
+  const s=t<14.4?spring(t-10.3,6,.38):1;const out=eio(win(t,14.4,15.4));
+  const rx=lerp(46,330,s)*(1-out*.55),ry=lerp(46,24,s)*(1+out*.2);const e=blob();e.setAttribute('cx',lerp(960,790,s));e.setAttribute('cy',555-out*20);e.setAttribute('rx',rx);e.setAttribute('ry',ry+wob(t-10.3,12,.2)*8);e.setAttribute('transform','');
+}
+
+/* ═════════ 场 3 · 按深度选方案（14.5–20.5）：同一滴液体，在三条流程里变成 点 / 线 / 面 ═════════ */
+head('变化 2 · 分级处理','按根因深度，选方案：点 · 线 · 面','同一条流程（取数 → 整理 → 汇总 → 检查 → 传递），改动深度不同。',14.6,20.6);
+const COL=[380,960,1540],STP=['取数','整理','汇总','检查','传递'],CY=640;
+const CT=[['一般操作问题 · 点','现有工具复用 · 轻量开发','数字化专才快速处理','1–2 周上线'],['复杂流程问题 · 线','流程优化 · 系统整合 · 规则调整','方案专家牵头，业务科技联合','2–4 周见效'],['重大业务问题 · 面','重新设计流程、规则、岗位分工','公司统筹，形成专项改造项目','1–3 个月推进']];
+CT.forEach((c,k)=>{const X=COL[k];T(c[0],X,420,34,{w:700,a:'middle'},15.2+k*.2,20.6);
+  L(`M${X-230} ${CY} H ${X+230}`,15.4+k*.2,20.6,{c:'rgba(34,48,31,.25)',w:2});
+  STP.forEach((s,i)=>{const nx=X-200+i*100;const n=el('circle',{cx:nx,cy:CY,r:9,fill:'#FBF8F0',stroke:INK,'stroke-width':2});wipe(n,15.6+k*.2+i*.05,20.6,.3);T(s,nx,CY+52,24,{a:'middle',c:MUTE},15.7+k*.2+i*.05,20.6);});
+  T(c[1],X,770,27,{a:'middle'},17.6+k*.5,20.6);T(c[2],X,810,25,{a:'middle',c:MUTE},17.8+k*.5,20.6);T(c[3],X,852,28,{a:'middle',w:700,c:OR4},18.0+k*.5,20.6);});
+T('避免把所有业务问题都变成工具开发任务。',960,950,30,{w:700,a:'middle'},19.2,20.6);
+function scene3(t){if(t<14.4||t>21.6)return;
+  const out=eio(win(t,20.6,21.6));
+  CT.forEach((c,k)=>{const X=COL[k],ta=14.6+k*.25,tb=16.2+k*.25;
+    if(t<tb+.05){const p=hop([960,555],[X,CY],t,ta,tb,180);drop(p[0],p[1],30,(X-960)*.8,0);return;}
+    const s=spring(t-tb,7,.34);
+    if(k===0){drop(X,CY,lerp(30,18,s)*(1-out),0,0,wob(t-tb)*.6);}               // 点：收成一粒，落在「汇总」上
+    if(k===1){for(let i=0;i<=12;i++){const u=i/12;drop(lerp(X,lerp(X-200,X+100,u),s),CY,lerp(30,13,s)*(1-out),0,0,0);}} // 线：拉成一条，连起 4 步
+    if(k===2){const e=blob();e.setAttribute('cx',X);e.setAttribute('cy',CY);e.setAttribute('rx',lerp(30,240,s)*(1-out*.8));e.setAttribute('ry',lerp(30,24,s)+wob(t-tb,11,.2)*8);e.setAttribute('transform','');}  // 面：漫过整条流程
+  });
+  if(t>20.6){const p=hop([COL[2],CY],[200,580],t,20.6,21.6,220);drop(p[0],p[1],34);}
+}
+
+/* ═════════ 场 4 · 六阶段落地（21–30）：液滴一站一站跳过去，每落一站，留下这一站的产出 ═════════ */
+head('变化 3 · 方案落地','从开发交付，到生产效果','业务不以需求审核为结束，科技不以需求上线为结束。',21.0,99);
+const ST6=['方案确认','联合设计','实施开发','现场试点','效果验收','复制推广'],OUT6=['项目实施方案','新流程 / 规则 / 技术设计','可试运行的方案','试点运行结果','业务验收和价值报告','可复制的成熟方案'],SY=580;
+const SX=i=>200+i*304;
+L(`M200 ${SY} H 1720`,21.4,99,{c:'rgba(34,48,31,.25)',w:2,d:1.4});
+const HOPT=i=>21.8+i*1.15;
+ST6.forEach((s,i)=>{const n=el('circle',{cx:SX(i),cy:SY,r:12,fill:'#FBF8F0',stroke:INK,'stroke-width':2.5});wipe(n,21.6+i*.1,99,.3);
+  T(s,SX(i),SY-40,32,{w:700,a:'middle'},21.7+i*.1,99);T(OUT6[i],SX(i),SY+64,27,{a:'middle',c:OR4,w:600},HOPT(i)+.35,99);});
+T('5 人  →  释放 3.5 人',SX(4),760,56,{w:700,a:'middle',c:OR4},HOPT(4)+.6,99);
+T('考勤审核原流程（示例，理论测算）· 以财务结果为唯一衡量标准',SX(4),806,22,{a:'middle',c:MUTE},HOPT(4)+.9,99);
+const COPY=[['其他条线',1500],['其他部门',1650],['下一场景',1800]];
+COPY.forEach(([n,x],i)=>T(n,x,900,24,{w:650,a:'middle'},HOPT(5)+.9+i*.15,99));
+T('一个单点诉求，被解决为一套更有效的生产方式。',110,1000,48,{w:700,ls:-1},HOPT(5)+1.8,99);
+const FILL=rectL();
+function scene4(t){if(t<21.6)return;
+  // 走过的流程线，被液体灌满
+  const reach=clamp((t-HOPT(0))/(HOPT(5)-HOPT(0)+.6));const xe=lerp(200,1720,eio(reach));
+  FILL.style.display='';FILL.setAttribute('x',200);FILL.setAttribute('y',SY-5);FILL.setAttribute('height',10);FILL.setAttribute('width',Math.max(0,xe-200));FILL.setAttribute('rx',5);
+  let i=0;while(i<5&&t>HOPT(i+1))i++;
+  const P=[SX(i),SY],Q=[SX(Math.min(5,i+1)),SY];
+  if(t<HOPT(0)){const p=hop([200,580],[SX(0),SY],t,21.6,HOPT(0),40);drop(p[0],p[1],30);}
+  else if(i<5&&t>HOPT(i)+.35){const f=tt=>hop(P,Q,tt,HOPT(i)+.35,HOPT(i+1),130);dropF(f,t,28);}
+  else{const tl=t-HOPT(i);drop(SX(i),SY-4,28,0,0,wob(tl,13,.24)*.7);}
+  // 复制推广：分成三滴，流向其他条线
+  if(t>HOPT(5)+.4){COPY.forEach(([n,x],k)=>{const f=tt=>hop([SX(5),SY],[x,860],tt,HOPT(5)+.4+k*.12,HOPT(5)+1.2+k*.12,90);dropF(f,t,16);});}
+}
+
+/* ═════════ 帧 ═════════ */
+function frame(t){np=0;nh=0;
+  document.getElementById('metal').setAttribute('gradientTransform',`translate(${t*38} ${t*22})`);
+  for(const it of ITEMS){const bb=it.bb||(it.bb=it.e.getBBox());const a=eio(win(t,it.tIn,it.tIn+it.dur)),b=eio(win(t,it.tOut,it.tOut+.6));
+    it.e.style.display=a<=0||b>=1?'none':'';const w=bb.width+40;it.r.setAttribute('x',bb.x-20+w*b);it.r.setAttribute('y',bb.y-30);it.r.setAttribute('height',bb.height+60);it.r.setAttribute('width',Math.max(0,w*a-w*b));}
+  for(const e of LINES){const {tIn,tOut,d}=e._L;const a=eio(win(t,tIn,tIn+d)),b=eio(win(t,tOut,tOut+.6));e.setAttribute('stroke-dashoffset',b>0?-b:1-a);e.style.display=a<=0||b>=1?'none':'';}
+  POOLR.style.display='none';FILL.style.display='none';
+  scene1(t);scene2(t);scene3(t);scene4(t);
+  for(let i=np;i<POOL.length;i++)POOL[i].style.display='none';for(let i=nh;i<HPOOL.length;i++)HPOOL[i].style.display='none';}
+
+/* ═════════ 播放 ═════════ */
+const TT=31;let t0=performance.now(),paused=false,pt=0,drag=false,idleT;
+const fil=document.getElementById('fil'),thumb=document.getElementById('thumb'),bar=document.getElementById('bar');
+function wake(){document.body.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!paused&&!drag)document.body.classList.add('idle');},1500);}
+document.addEventListener('mousemove',wake);document.addEventListener('touchstart',wake);
+const seekAt=e=>{const r=document.getElementById('trk').getBoundingClientRect();pt=clamp((e.clientX-r.left)/r.width)*TT;t0=performance.now()-pt*1000;};
+bar.onpointerdown=e=>{drag=true;bar.setPointerCapture(e.pointerId);seekAt(e);wake();};bar.onpointermove=e=>{if(drag)seekAt(e);};bar.onpointerup=()=>{drag=false;wake();};
+function loop(n){if(!paused&&!drag){pt=(n-t0)/1000;if(pt>TT+2){t0=n;pt=0;}}const f=Math.min(pt,TT)/TT*100;fil.style.width=f+'%';thumb.style.left=f+'%';frame(Math.min(pt,TT));requestAnimationFrame(loop);}
+const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();};S.ondblclick=fs;
+document.onkeydown=e=>{if(e.key==='f'||e.key==='F')fs();if(e.key===' '){e.preventDefault();paused=!paused;if(!paused)t0=performance.now()-pt*1000;wake();}};
+const q=new URLSearchParams(location.search).get('t');
+document.fonts.ready.then(()=>{if(q!==null){frame(+q);window.__ready=true;}else{t0=performance.now();wake();requestAnimationFrame(loop);}});
+window.frame=frame;
+</script></body></html>
