@@ -4,14 +4,15 @@
 <link rel="stylesheet" href="../fonts/MiSansVF.min.css">
 <style>html,body{margin:0;height:100%;background:#FBF8F0;overflow:hidden}.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
 canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block}
-.ctl{position:fixed;left:14px;bottom:10px;font:13px -apple-system,"PingFang SC",sans-serif;color:#8B8C80;display:flex;gap:6px;align-items:center}.ctl button{font:inherit;border:1px solid rgba(0,0,0,.2);background:transparent;border-radius:6px;padding:4px 10px;cursor:pointer}.ctl input{width:260px}#pro{position:fixed;right:28px;bottom:18px;font:900 64px "MiSans VF","PingFang SC",sans-serif;letter-spacing:4px;cursor:pointer;user-select:none;line-height:1;transition:opacity .5s}
-#pro .bg{color:transparent;-webkit-text-stroke:1.2px rgba(34,48,31,.35)}
-#pro .fg{position:absolute;left:0;top:0;white-space:nowrap;overflow:hidden;width:0;background:linear-gradient(90deg,#56964A,#A8B234,#F6BE2C,#F27026);background-size:154px 100%;-webkit-background-clip:text;background-clip:text;color:transparent}
-.ctl{transition:opacity .5s}.idle #pro,.idle .ctl{opacity:0;pointer-events:none}.ctl input{display:none}
+.ctl{position:fixed;left:14px;bottom:10px;font:13px -apple-system,"PingFang SC",sans-serif;color:#8B8C80;display:flex;gap:6px;align-items:center}.ctl button{font:inherit;border:1px solid rgba(0,0,0,.2);background:transparent;border-radius:6px;padding:4px 10px;cursor:pointer}.ctl input{width:260px}.ctl{transition:opacity .5s}.idle #bar,.idle .ctl{opacity:0;pointer-events:none}.ctl input{display:none}
+#bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:min(420px,46vw);height:26px;cursor:pointer;transition:opacity .5s;touch-action:none}
+#trk{position:absolute;left:0;right:0;top:12px;height:2px;border-radius:2px;background:rgba(34,48,31,.16)}
+#fil{height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#56964A,#A8B234,#F6BE2C,#F27026)}
+#thumb{position:absolute;top:13px;left:0;transform:translate(-50%,-50%);font:700 11px "MiSans VF","PingFang SC",sans-serif;letter-spacing:1px;color:#FBF8F0;background:#22301F;border-radius:999px;padding:3px 8px 3px 9px;box-shadow:0 1px 3px rgba(0,0,0,.15);white-space:nowrap}
 </style></head>
 <body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
-<div id="pro" title="拖动 / 点击跳转"><span class="bg">专业</span><span class="fg" id="fg">专业</span></div>
-<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><button id="fs">全屏 (F)</button><input id="sk" type="range" min="0" max="17" step=".05" value="0"><span id="tm"></span></div>
+<div id="bar"><div id="trk"><div id="fil"></div></div><div id="thumb">专业</div></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><button id="fs">全屏 (F)</button></div>
 <script>
 const c=document.getElementById('c'),x=c.getContext('2d');
 const FONT='"MiSans VF","PingFang SC",sans-serif';
@@ -65,20 +66,38 @@ function blob(X,Y,rx,ry,k){return [...Array(M)].map((_,j)=>{const t=j/(M-1)*6.28
 
 /* 状态时间表：每次形变按线的序号错峰（像一阵风吹过），用弹簧落定 */
 const KT=[0,2.6,5.0,8.0,11.0,14.0];
-function shapeAt(d,t){let s=0;while(s<KT.length-1&&t>=KT[s+1])s++;const A=ST[Math.max(0,s-1)](d),B=ST[s](d);
-  if(s===0)return {...B,k:1};const delay=(d.i/N)*.75,k=bounce(t-KT[s]-delay,7.2,.36);
-  const pa=A.pts,pb=B.pts;const pts=[...Array(M)].map((_,j)=>{const ia=Math.min(pa.length-1,Math.round(j/(M-1)*(pa.length-1))),ib=Math.min(pb.length-1,Math.round(j/(M-1)*(pb.length-1)));
-    // 形变中段：轻微的「液体」鼓胀 —— 点沿法向被推开再收回
-    const kk=clamp(k,0,1.2),mid=Math.sin(Math.PI*clamp(k));const bulge=mid*16*Math.sin(j*.35+d.seed+t*3);const swirl=mid*40*Math.sin(d.seed);
-    return [lerp(pa[ia][0],pb[ib][0],kk)+swirl*Math.cos(j*.08),lerp(pa[ia][1],pb[ib][1],kk)+bulge];});
-  return {pts,w:lerp(A.w,B.w,clamp(k)),c:B.c<0?-1:lerp(A.c<0?.5:A.c,B.c,clamp(k)),k};}
-function alive(S,d,t){const amp=S.w>8?1.2:2.4;return {...S,pts:S.pts.map(([a,b],j)=>[a,b+Math.sin(j*.22-t*2.6+d.seed)*amp])};}
-function beads(d,S,t){if(S.w>8)return;const p0=S.pts;let L=0;for(let j=1;j<p0.length;j++)L+=Math.hypot(p0[j][0]-p0[j-1][0],p0[j][1]-p0[j-1][1]);if(L<300)return;const p=S.pts,n=p.length;for(let b=0;b<2;b++){const u=((t*.32+d.seed*.1+b*.5)%1);const j=Math.floor(u*(n-1));const cc=S.c<0?rip(u):rip(S.c);
-  x.fillStyle=rgb(cc.map(v=>v*.82),.95);const q=p[j],r=p[Math.min(n-1,j+1)];const a=Math.atan2(r[1]-q[1],r[0]-q[0]);x.beginPath();x.ellipse(q[0],q[1],S.w*2.4+2,S.w*1.1+1,a,0,7);x.fill();}}
-function drawLine(d,S){const p=S.pts;x.save();x.lineCap='round';x.lineJoin='round';
-  for(let j=1;j<p.length;j++){const t=j/(p.length-1);const press=.55+.45*Math.sin(Math.PI*t);const cc=S.c<0?rip(t):rip(S.c);
-    x.strokeStyle=rgb(cc,.92);x.lineWidth=Math.max(.6,S.w*press);x.beginPath();x.moveTo(...p[j-1]);x.lineTo(...p[j]);x.stroke();}
-  x.restore();}
+/* ═════ 真正的形变：每个状态先按弧长重采样成同样 48 个点并缓存，
+   形变 = 同一根线上的每个点，从上一形状的对应点连续滑到下一形状的对应点 ═════ */
+const MP=48;
+function resample(pts){const L=[0];for(let i=1;i<pts.length;i++)L.push(L[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  const tot=L[L.length-1]||1,out=new Float32Array(MP*2);let j=0;
+  for(let i=0;i<MP;i++){const s=tot*i/(MP-1);while(j<L.length-2&&L[j+1]<s)j++;const f=Math.min(1,(s-L[j])/((L[j+1]-L[j])||1));
+    out[i*2]=pts[j][0]+(pts[j+1][0]-pts[j][0])*f;out[i*2+1]=pts[j][1]+(pts[j+1][1]-pts[j][1])*f;}return out;}
+const CACHE=ST.map(fn=>D.map(d=>{const S=fn(d);return {p:resample(S.pts),w:S.w,c:S.c};}));
+// 弹簧：轻微过冲（约 8%）后落定 —— 弹跳感
+const spring=(t,w=6.5,z=.62)=>{if(t<=0)return 0;const q=Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(w*q*t)+z/q*Math.sin(w*q*t));};
+const BUF=D.map(()=>new Float32Array(MP*2)),LX=new Float32Array(MP*2),RX=new Float32Array(MP*2);
+function shapeAt(d,t){let s=0;while(s<KT.length-1&&t>=KT[s+1])s++;const B=CACHE[s][d.i],out=BUF[d.i];
+  if(s===0){out.set(B.p);}else{const A=CACHE[s-1][d.i],t0=t-KT[s]-(d.i/N)*.45;
+    const side=Math.sin(d.seed*6.1)*36;
+    for(let j=0;j<MP;j++){const k=spring(t0-j/MP*.22);          // 线头先走、线尾跟上：像液体被拉过去
+      const arc=Math.sin(Math.PI*Math.min(1,Math.max(0,k)))*side;   // 途中走一段弧，不是直线平移
+      out[j*2]=A.p[j*2]+(B.p[j*2]-A.p[j*2])*k;out[j*2+1]=A.p[j*2+1]+(B.p[j*2+1]-A.p[j*2+1])*k+arc;}}
+  const k=s===0?1:Math.min(1,Math.max(0,spring(t-KT[s]-(d.i/N)*.45)));const A=s===0?B:CACHE[s-1][d.i];
+  // 落定后：沿线传播的细小波 —— 一直在流
+  const amp=(B.w>8?.8:2.2)*Math.min(1,k);for(let j=0;j<MP;j++)out[j*2+1]+=Math.sin(j*.3-t*2.4+d.seed)*amp;
+  const kw=B.w<A.w?Math.min(1,k*2.2):k;return {p:out,w:A.w+(B.w-A.w)*kw,c:B.c<0?-1:(A.c<0?.5:A.c)+(B.c-(A.c<0?.5:A.c))*k};}
+let GRAD=null;
+function drawLine(d,S){const p=S.p;
+  // 笔触：沿法线两侧偏移，围成一个两头收尖的形状，一次填充（快，而且有笔压）
+  for(let j=0;j<MP;j++){const a=Math.max(0,j-1),b=Math.min(MP-1,j+1);let nx=-(p[b*2+1]-p[a*2+1]),ny=p[b*2]-p[a*2];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
+    const t=j/(MP-1),hw=S.w*(.5+.5*Math.sin(Math.PI*t))*.5+.35;LX[j*2]=p[j*2]+nx*hw;LX[j*2+1]=p[j*2+1]+ny*hw;RX[j*2]=p[j*2]-nx*hw;RX[j*2+1]=p[j*2+1]-ny*hw;}
+  x.beginPath();x.moveTo(LX[0],LX[1]);for(let j=1;j<MP;j++)x.lineTo(LX[j*2],LX[j*2+1]);for(let j=MP-1;j>=0;j--)x.lineTo(RX[j*2],RX[j*2+1]);x.closePath();
+  if(S.c<0){if(!GRAD){GRAD=x.createLinearGradient(110,0,1810,0);STOPS.forEach((s,i)=>GRAD.addColorStop(i/3,rgb(s)));}x.fillStyle=GRAD;}else x.fillStyle=rgb(rip(S.c),.95);
+  x.fill();}
+function beads(d,S,t){if(S.w>8)return;const p=S.p;const dx=p[(MP-1)*2]-p[0],dy=p[(MP-1)*2+1]-p[1];if(dx*dx+dy*dy<300*300)return;
+  const u=(t*.3+d.seed*.1)%1,j=Math.floor(u*(MP-2));const a=Math.atan2(p[j*2+3]-p[j*2+1],p[j*2+2]-p[j*2]);
+  x.fillStyle=rgb((S.c<0?rip(u):rip(S.c)).map(v=>v*.8));x.beginPath();x.ellipse(p[j*2],p[j*2+1],S.w*2+3,S.w*.9+1.2,a,0,7);x.fill();}
 
 /* ═════ 编辑排版层：每个状态都有自己的注记、刻度和图例 ═════ */
 function legend(t,a,b){const p=win(t,a,a+.8)*(1-win(t,b,b+.5));if(p<=0)return;x.save();x.globalAlpha=p;const X=1560,Y=830;
@@ -114,18 +133,19 @@ function overlay(t){
   const f=win(t,14.6,15.4);if(f>0){x.save();x.globalAlpha=f;['业务问题发现','专家现场诊断','方案评审与资源','联合实施','生产效果验证','复制推广'].forEach((s,i)=>{const X=170+i*320;hair([[X,CY-120],[X,CY+120]],.18,1,[2,5]);T(s,X,CY-136,{s:18,w:650,a:i===5?'right':i===0?'left':'center'});T(['青','','橘绿','','黄','橙'][i],X,CY+150,{s:13,c:MUTE,a:i===5?'right':i===0?'left':'center'});});x.restore();}
   legend(t,5.6,99);
 }
-const MICRO=[...Array(1700)].map((_,i)=>[600+(i%85)*15,288+((i/85)|0)*31.5]);
-function frame(t){x.setTransform(1,0,0,1,0,0);x.drawImage(paper,0,0);
-  const mg=win(t,.1,1)*(1-win(t,2.4,3.2));if(mg>0){x.fillStyle=`rgba(86,150,74,${.28*mg})`;for(const [a,b] of MICRO){x.fillRect(a,b,2,2);}T('底下每一粒 = 1 个工具，共 1700 个',600,960,{s:14,c:MUTE,op:mg});}for(const d of D){const S=alive(shapeAt(d,t),d,t);drawLine(d,S);beads(d,S,t);}overlay(t);}
-let t0=performance.now(),paused=false,pt=0;const TT=17,sk=document.getElementById('sk');
-const fg=document.getElementById('fg'),pro=document.getElementById('pro');let idleT;
-function wake(){document.body.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!paused)document.body.classList.add('idle');},1600);}
+const MICRO=document.createElement('canvas');MICRO.width=1920;MICRO.height=1080;{const g=MICRO.getContext('2d');g.fillStyle='rgba(86,150,74,.28)';for(let i=0;i<1700;i++)g.fillRect(600+(i%85)*15,288+((i/85)|0)*31.5,2,2);}
+function frame(t){x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.drawImage(paper,0,0);
+  const mg=win(t,.1,1)*(1-win(t,2.4,3.2));if(mg>0){x.globalAlpha=mg;x.drawImage(MICRO,0,0);x.globalAlpha=1;T('底下每一粒 = 1 个工具，共 1700 个',600,960,{s:14,c:MUTE,op:mg});}
+  for(const d of D){const S=shapeAt(d,t);drawLine(d,S);beads(d,S,t);}overlay(t);}
+let t0=performance.now(),paused=false,pt=0;const TT=17;
+const bar=document.getElementById('bar'),fil=document.getElementById('fil'),thumb=document.getElementById('thumb');let idleT;
+function wake(){document.body.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!paused&&!drag)document.body.classList.add('idle');},1500);}
 document.addEventListener('mousemove',wake);document.addEventListener('touchstart',wake);
-let drag=false;const seekAt=e=>{const r=pro.getBoundingClientRect();pt=clamp((e.clientX-r.left)/r.width)*TT;t0=performance.now()-pt*1000;};
-pro.onpointerdown=e=>{drag=true;pro.setPointerCapture(e.pointerId);seekAt(e);};pro.onpointermove=e=>{if(drag)seekAt(e);};pro.onpointerup=()=>drag=false;
-function loop(n){if(!paused){pt=(n-t0)/1000;if(pt>TT+2)t0=n,pt=0;sk.value=Math.min(pt,TT);}fg.style.width=(Math.min(pt,TT)/TT*100)+'%';frame(Math.min(pt,TT));document.getElementById('tm').textContent=Math.min(pt,TT).toFixed(1)+' s';requestAnimationFrame(loop);}
+let drag=false;const seekAt=e=>{const r=document.getElementById('trk').getBoundingClientRect();pt=clamp((e.clientX-r.left)/r.width)*TT;t0=performance.now()-pt*1000;};
+bar.onpointerdown=e=>{drag=true;bar.setPointerCapture(e.pointerId);seekAt(e);wake();};bar.onpointermove=e=>{if(drag)seekAt(e);};bar.onpointerup=()=>{drag=false;wake();};
+function loop(n){if(!paused&&!drag){pt=(n-t0)/1000;if(pt>TT+2)t0=n,pt=0;}const f=Math.min(pt,TT)/TT*100;fil.style.width=f+'%';thumb.style.left=f+'%';frame(Math.min(pt,TT));requestAnimationFrame(loop);}
 document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;wake();};
-document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;};sk.oninput=()=>{pt=+sk.value;t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;};
 const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();};document.getElementById('fs').onclick=fs;c.ondblclick=fs;document.onkeydown=e=>{if(e.key==='f'||e.key==='F')fs();if(e.key===' '){e.preventDefault();document.getElementById('pp').click();}};
 const q=new URLSearchParams(location.search).get('t');
 document.fonts.ready.then(()=>{if(q!==null){frame(+q);window.__ready=true;}else{t0=performance.now();wake();requestAnimationFrame(loop);}});
