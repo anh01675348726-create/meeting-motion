@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>线条样张 2 · 编辑数据叙事</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;height:100%;background:#FBF8F0;overflow:hidden}.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block}
+.ctl{position:fixed;left:14px;bottom:10px;font:13px -apple-system,"PingFang SC",sans-serif;color:#8B8C80;display:flex;gap:6px;align-items:center}.ctl button{font:inherit;border:1px solid rgba(0,0,0,.2);background:transparent;border-radius:6px;padding:4px 10px;cursor:pointer}.ctl input{width:260px}</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div class="ctl"><button id="pp">暂停</button><button id="rs">重播</button><button id="fs">全屏 (F)</button><input id="sk" type="range" min="0" max="17" step=".05" value="0"><span id="tm"></span></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC",sans-serif';
+/* ── 明亮版 橙黄橘绿：叶青 → 橘绿 → 柑黄 → 橙 ── */
+const INK='#22301F',MUTE='#8A8C7A',PAPER='#FBF8F0';
+const STOPS=[[86,150,74],[168,178,52],[246,190,44],[242,112,38]];
+const rip=t=>{t=Math.max(0,Math.min(1,t))*3;const i=Math.min(2,Math.floor(t)),f=t-i,a=STOPS[i],b=STOPS[i+1];return a.map((v,k)=>v+(b[k]-v)*f);};
+const rgb=(a,al=1)=>`rgba(${a.map(Math.round)},${al})`;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,exo=t=>t>=1?1:1-Math.pow(2,-10*t);
+const sp=(t,w=7)=>t<=0?0:1-(1+w*t)*Math.exp(-w*t);
+let sd=11;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=PAPER;g.fillRect(0,0,1920,1080);
+  const n=document.createElement('canvas');n.width=640;n.height=360;const ng=n.getContext('2d');const im=ng.createImageData(640,360);for(let i=0;i<640*360;i++){const v=232+R()*23;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.12;g.drawImage(n,0,0,1920,1080);})();
+function T(s,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||20}px ${FONT}`;x.fillStyle=o.c||INK;x.textAlign=o.a||'left';x.globalAlpha=o.op??1;x.letterSpacing=(o.ls||0)+'px';x.fillText(s,X,Y);x.restore();}
+function W(s,X,Y,o,p){if(p<=0)return;x.save();x.font=`${o.w||400} ${o.s||20}px ${FONT}`;const w=x.measureText(s).width;const a=o.a==='right'?X-w:o.a==='center'?X-w/2:X;x.beginPath();x.rect(a-4,Y-o.s*1.15,(w+8)*eio(p),o.s*1.6);x.clip();T(s,X,Y,o);x.restore();}
+const hair=(pts,al=.45,w=1,dash)=>{x.save();x.strokeStyle=`rgba(34,48,31,${al})`;x.lineWidth=w;if(dash)x.setLineDash(dash);x.beginPath();pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.stroke();x.restore();};
+
+/* ═════ 40 根线，每根 = 20 条需求；每根线的数据属性（示意）═════ */
+const N=40,M=64;
+const D=[...Array(N)].map((_,i)=>{const src=i<16?0:i<28?1:2;           // 来源：前线 16 · 经营 12 · 巡检 12（示意）
+  const layer=[0,0,1,3,1,2,0,3,1,0][i%10];                                   // 根因所在层：操作 / 流程 / 规则 / 分工
+  const tier=layer===0?0:layer===3?2:1;                                      // 处理：点 / 线 / 面
+  return {i,src,layer,tier,size:.5+R(),gx:i%8,gy:(i/8)|0,ang:R()*6.283,dx:R(),dy:R(),seed:R()*10};});
+/* 每个状态：给出第 i 根线的 M 个点 + 颜色成熟度 + 线宽 */
+const CX=980,CY=600;
+const ST=[
+ // 0 · 点：一格一格的墨点（大小 = 这一格里的工具数，示意）
+ d=>{const X=760+d.gx*130+(d.gy%2)*30,Y=330+d.gy*120;const r=6+d.size*7;return {pts:circ(X,Y,r*.15),w:r,c:.02};},
+ // 1 · 点状需求：散开成短划，方向各异
+ d=>{const X=700+d.dx*1050,Y=300+d.dy*600,L=26+d.size*30;return {pts:seg(X-Math.cos(d.ang)*L/2,Y-Math.sin(d.ang)*L/2,X+Math.cos(d.ang)*L/2,Y+Math.sin(d.ang)*L/2),w:3,c:.05};},
+ // 2 · 三条来源汇成一束（米纳德）
+ d=>{const ys=[300,560,820][d.src],k=d.i-(d.src===0?0:d.src===1?16:28),cnt=d.src===0?16:12,o=(k-(cnt-1)/2)*7;const ty=CY+(d.i-19.5)*3.2;
+   return {pts:bz([170,ys+o],[640,ys+o],[760,ty],[1180,ty]).concat(seg(1180,ty,1500,ty).slice(1)),w:1.6,c:.22};},
+ // 3 · 四层诊断：线变成射线，长度 = 根因所在的深度
+ d=>{const a=-Math.PI/2+d.i/N*Math.PI*2,r0=70,r1=[150,230,310,390][d.layer]+d.size*14;return {pts:seg(CX+Math.cos(a)*r0,CY+Math.sin(a)*r0*.92,CX+Math.cos(a)*r1,CY+Math.sin(a)*r1*.92),w:2.2,c:.32+d.layer*.08};},
+ // 4 · 三级处理：点（收成一粒）· 线（串成链）· 面（一圈圈等高线）
+ d=>{if(d.tier===0){const k=D.filter(e=>e.tier===0).indexOf(d);const X=360+(k%5)*36,Y=470+((k/5)|0)*44;return {pts:circ(X,Y,1.5),w:9,c:.5};}
+   if(d.tier===1){const k=D.filter(e=>e.tier===1).indexOf(d);const Y=430+k*16;return {pts:wave(830,Y,1250,Y,k),w:2,c:.72};}
+   const k=D.filter(e=>e.tier===2).indexOf(d);const r=26+k*18;return {pts:blob(1560,640,r*1.35,r*.78,k),w:1.6,c:.86+k*.016};},
+ // 5 · 流程：全部汇成一条编织的长带，沿流程越往右越熟
+ d=>{const o=(d.i-19.5)*4.2;return {pts:[...Array(M)].map((_,j)=>{const t=j/(M-1),X=170+t*1600;return [X,CY+o*(1-.55*Math.sin(Math.PI*t))+Math.sin(t*9+d.i*.7)*3*(1-t)];}),w:1.5,c:-1};},
+];
+function seg(a,b,c2,d2){return [...Array(M)].map((_,j)=>{const t=j/(M-1);return [lerp(a,c2,t),lerp(b,d2,t)];});}
+function circ(X,Y,r){return [...Array(M)].map((_,j)=>{const t=j/(M-1)*6.283;return [X+Math.cos(t)*r,Y+Math.sin(t)*r];});}
+function bz(p0,p1,p2,p3){const n=M/2;return [...Array(n)].map((_,j)=>{const t=j/(n-1),u=1-t;return [u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]];});}
+function wave(a,b,c2,d2,k){return [...Array(M)].map((_,j)=>{const t=j/(M-1);return [lerp(a,c2,t),lerp(b,d2,t)+Math.sin(t*12+k)*5];});}
+function blob(X,Y,rx,ry,k){return [...Array(M)].map((_,j)=>{const t=j/(M-1)*6.283;const w=1+.1*Math.sin(t*3+k*.6)+.05*Math.sin(t*5-k);return [X+Math.cos(t)*rx*w,Y+Math.sin(t)*ry*w];});}
+
+/* 状态时间表：每次形变按线的序号错峰（像一阵风吹过），用弹簧落定 */
+const KT=[0,2.6,5.0,8.0,11.0,14.0];
+function shapeAt(d,t){let s=0;while(s<KT.length-1&&t>=KT[s+1])s++;const A=ST[Math.max(0,s-1)](d),B=ST[s](d);
+  if(s===0)return {...B,k:1};const delay=(d.i/N)*.7,k=sp(t-KT[s]-delay,5.5);
+  const pa=A.pts,pb=B.pts;const pts=[...Array(M)].map((_,j)=>{const ia=Math.min(pa.length-1,Math.round(j/(M-1)*(pa.length-1))),ib=Math.min(pb.length-1,Math.round(j/(M-1)*(pb.length-1)));
+    // 形变中段：轻微的「液体」鼓胀 —— 点沿法向被推开再收回
+    const bulge=Math.sin(Math.PI*clamp(k))*6*Math.sin(j*.5+d.seed);return [lerp(pa[ia][0],pb[ib][0],k),lerp(pa[ia][1],pb[ib][1],k)+bulge];});
+  return {pts,w:lerp(A.w,B.w,clamp(k)),c:B.c<0?-1:lerp(A.c<0?.5:A.c,B.c,clamp(k)),k};}
+function drawLine(d,S){const p=S.pts;x.save();x.lineCap='round';x.lineJoin='round';
+  for(let j=1;j<p.length;j++){const t=j/(p.length-1);const press=.55+.45*Math.sin(Math.PI*t);const cc=S.c<0?rip(t):rip(S.c);
+    x.strokeStyle=rgb(cc,.92);x.lineWidth=Math.max(.6,S.w*press);x.beginPath();x.moveTo(...p[j-1]);x.lineTo(...p[j]);x.stroke();}
+  x.restore();}
+
+/* ═════ 编辑排版层：每个状态都有自己的注记、刻度和图例 ═════ */
+function legend(t,a,b){const p=win(t,a,a+.8)*(1-win(t,b,b+.5));if(p<=0)return;x.save();x.globalAlpha=p;const X=1560,Y=900;
+  hair([[X,Y-34],[X+250,Y-34]],.3);T('读图方法',X,Y-44,{s:15,w:650,c:MUTE,ls:2});
+  x.strokeStyle=rgb(rip(.1));x.lineWidth=2;x.beginPath();x.moveTo(X,Y);x.lineTo(X+40,Y);x.stroke();T('一根线 = 20 条需求（示意）',X+52,Y+5,{s:15});
+  for(let i=0;i<4;i++){x.fillStyle=rgb(STOPS[i]);x.fillRect(X+i*12,Y+24,10,10);}T('颜色 = 成熟度：青 → 橙',X+52,Y+35,{s:15});
+  hair([[X,Y+60],[X+40,Y+60]],.8,1);hair([[X,Y+54],[X,Y+66]],.8);hair([[X+40,Y+54],[X+40,Y+66]],.8);T('长度 = 根因深度',X+52,Y+65,{s:15});x.restore();}
+function overlay(t){
+  T('议题三 · 线条样张 2',110,92,{s:20,w:650,c:'#C77A1E',ls:4});
+  const H=[['1700+ 个工具，一格一格的点',.1,2.4],['需求也是一个个点：方向各异',2.7,4.8],['进了流程，汇成一束线',5.1,7.8],['先找根因：往下钻四层',8.1,10.8],['按深度处理：点 · 线 · 面',11.1,13.8],['最后汇成一条流程，越往后越熟',14.1,99]];
+  H.forEach(([s,a,b])=>{const p=win(t,a,a+1),q=win(t,b,b+.4);if(p>0&&q<1){x.save();x.globalAlpha=1-q;W(s,108,156,{s:46,w:650,ls:-1},p);x.restore();}});
+  // 0 · 点阵的格线与行列号
+  const g=win(t,.3,1.2)*(1-win(t,2.4,3));if(g>0){x.save();x.globalAlpha=g;for(let r=0;r<5;r++){hair([[700,330+r*120],[1770,330+r*120]],.12);T(String.fromCharCode(65+r),676,336+r*120,{s:13,c:MUTE});}
+    for(let k=0;k<8;k++)T(String(k+1).padStart(2,'0'),760+k*130,300,{s:13,c:MUTE,a:'center'});
+    T('点越大，这一格的工具越多',110,820,{s:18,c:MUTE});T('1000+ 专才 · 1700+ 工具',110,860,{s:30,w:650});T('彼此不相连',112,894,{s:18,c:MUTE});x.restore();}
+  // 1 · 短划的方向标注
+  const h=win(t,3.3,4)*(1-win(t,4.8,5.2));if(h>0){x.save();x.globalAlpha=h;T('一线员工提的，多是「点状」需求：',110,820,{s:22,w:650});T('说不清普遍痛点、发生频率、影响程度、优化效益',110,856,{s:18,c:MUTE});
+    const d=D[7];const X=700+d.dx*1050,Y=300+d.dy*600;hair([[X,Y],[X+80,Y-70],[X+220,Y-70]],.5);T('「希望自动整理报表」',X+86,Y-80,{s:16});x.restore();}
+  // 2 · 三条来源标签 + 计数
+  const m=win(t,5.8,6.6)*(1-win(t,7.8,8.2));if(m>0){x.save();x.globalAlpha=m;[[300,'前线提报','16 根'],[560,'经营识别','12 根'],[820,'专家巡检','12 根']].forEach(([y,n,cnt],k)=>{T(n,170,y-60,{s:22,w:650,c:rgb(rip(.1))});T(cnt,170+n.length*22+10,y-60,{s:15,c:MUTE});});
+    hair([[1500,CY-80],[1500,CY+80]],.6);T('问题清单',1516,CY-60,{s:20,w:650});T('统一字段 · 按月汇总',1516,CY-36,{s:14,c:MUTE});x.restore();}
+  // 3 · 四层同心圆 + 刻度
+  const r=win(t,8.2,9.2)*(1-win(t,10.8,11.2));if(r>0){x.save();x.globalAlpha=r;['操作环节','业务流程','业务规则','生产分工'].forEach((n,k)=>{const rr=[150,230,310,390][k];x.strokeStyle=`rgba(34,48,31,${.16+k*.04})`;x.setLineDash([2,5]);x.lineWidth=1;x.beginPath();x.ellipse(CX,CY,rr*eio(r),rr*.92*eio(r),0,0,7);x.stroke();x.setLineDash([]);
+      const a=-.62,lx=CX+Math.cos(a)*rr,ly=CY+Math.sin(a)*rr*.92;x.fillStyle=INK;x.beginPath();x.arc(lx,ly,3,0,7);x.fill();hair([[lx,ly],[1500,ly]],.25);T(n,1510,ly+5,{s:17,w:650});T(['重复、复杂、高耗时？','衔接不顺、反复审核？','标准不统一、规则过多？','分工不合理、人工做标准任务？'][k],1600,ly+5,{s:14,c:MUTE});});
+    T('不是每个问题都要走完四层，也不是层次越高越好',110,860,{s:18,c:MUTE});x.restore();}
+  // 4 · 三级处理的标题和参数
+  const o=win(t,11.6,12.4)*(1-win(t,13.8,14.2));if(o>0){x.save();x.globalAlpha=o;
+    [[360,'一般操作问题 · 点','数字化专才快速处理','1–2 周上线',.5],[830,'复杂流程问题 · 线','解决方案专家牵头','2–4 周见效',.72],[1440,'重大业务问题 · 面','公司统筹，专项改造','1–3 个月推进',.95]].forEach(([X,a,b,cc,ci])=>{T(a,X,380,{s:22,w:650,c:INK});T(b,X,406,{s:15,c:MUTE});T(cc,X,430,{s:15,w:650,c:rgb(rip(ci))});});
+    // 小柱：每一级各有几根线（真实来自上面的数据）
+    [0,1,2].forEach(k=>{const n=D.filter(d=>d.tier===k).length;for(let i=0;i<n;i++){x.fillStyle=rgb(rip([.5,.72,.95][k]));x.fillRect(110+k*90,900-i*7,60,5);}T(['点','线','面'][k]+' '+n,110+k*90,926,{s:14,c:MUTE});});
+    x.restore();}
+  // 5 · 流程刻度
+  const f=win(t,14.6,15.4);if(f>0){x.save();x.globalAlpha=f;['业务问题发现','专家现场诊断','方案评审与资源','联合实施','生产效果验证','复制推广'].forEach((s,i)=>{const X=170+i*320;hair([[X,CY-120],[X,CY+120]],.18,1,[2,5]);T(s,X,CY-136,{s:18,w:650,a:i===5?'right':i===0?'left':'center'});T(['青','','橘绿','','黄','橙'][i],X,CY+150,{s:13,c:MUTE,a:i===5?'right':i===0?'left':'center'});});x.restore();}
+  legend(t,5.6,99);
+}
+const MICRO=[...Array(1700)].map((_,i)=>[700+(i%85)*12.6,300+((i/85)|0)*24.5]);
+function frame(t){x.setTransform(1,0,0,1,0,0);x.drawImage(paper,0,0);
+  const mg=win(t,.1,1)*(1-win(t,2.4,3.2));if(mg>0){x.fillStyle=`rgba(86,150,74,${.28*mg})`;for(const [a,b] of MICRO){x.fillRect(a,b,2,2);}T('底下每一粒 = 1 个工具，共 1700 个',700,850,{s:14,c:MUTE,op:mg});}for(const d of D)drawLine(d,shapeAt(d,t));overlay(t);}
+let t0=performance.now(),paused=false,pt=0;const TT=17,sk=document.getElementById('sk');
+function loop(n){if(!paused){pt=(n-t0)/1000;if(pt>TT+2)t0=n,pt=0;sk.value=Math.min(pt,TT);}frame(Math.min(pt,TT));document.getElementById('tm').textContent=Math.min(pt,TT).toFixed(1)+' s';requestAnimationFrame(loop);}
+document.getElementById('pp').onclick=e=>{paused=!paused;e.target.textContent=paused?'播放':'暂停';if(!paused)t0=performance.now()-pt*1000;};
+document.getElementById('rs').onclick=()=>{t0=performance.now();pt=0;};sk.oninput=()=>{pt=+sk.value;t0=performance.now()-pt*1000;};
+const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();};document.getElementById('fs').onclick=fs;c.ondblclick=fs;document.onkeydown=e=>{if(e.key==='f'||e.key==='F')fs();if(e.key===' '){e.preventDefault();document.getElementById('pp').click();}};
+const q=new URLSearchParams(location.search).get('t');
+document.fonts.ready.then(()=>{if(q!==null){frame(+q);window.__ready=true;}else{t0=performance.now();requestAnimationFrame(loop);}});
+</script></body></html>
