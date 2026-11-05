@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>橙黄橘绿 · 线条样张</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>html,body{margin:0;height:100%;background:#F5F0E4;overflow:hidden}.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block}
+.ctl{position:fixed;left:14px;bottom:10px;font:13px -apple-system,"PingFang SC",sans-serif;color:#8B8C80}.ctl button{font:inherit;border:1px solid rgba(0,0,0,.2);background:transparent;border-radius:6px;padding:4px 10px;cursor:pointer}</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div><div class="ctl"><button id="rs">重播</button> <button id="fs">全屏 (F)</button></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC",sans-serif';
+/* ── 橙黄橘绿：一颗橘子从青到熟的四个阶段，当作「成熟度」用 ── */
+const PAL={paper:'#F5F0E4',ink:'#2B3324',mute:'#8E8C7C',
+  青:[78,108,62],      // 青橘：现状 / 问题
+  橘绿:[150,152,64],   // 转色：正在诊断
+  黄:[230,178,58],     // 黄：方案成形
+  橙:[224,108,40]};    // 橙：见效
+const STOPS=[PAL.青,PAL.橘绿,PAL.黄,PAL.橙];
+const ripe=t=>{t=Math.max(0,Math.min(1,t))*(STOPS.length-1);const i=Math.min(STOPS.length-2,Math.floor(t)),f=t-i,a=STOPS[i],b=STOPS[i+1];return `rgb(${a.map((v,k)=>Math.round(v+(b[k]-v)*f))})`;};
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2,exo=t=>t>=1?1:1-Math.pow(2,-10*t);
+let sd=4;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=PAL.paper;g.fillRect(0,0,1920,1080);
+  const n=document.createElement('canvas');n.width=640;n.height=360;const ng=n.getContext('2d');const im=ng.createImageData(640,360);for(let i=0;i<640*360;i++){const v=222+R()*33;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.16;g.drawImage(n,0,0,1920,1080);
+  // 纸上的纤维：极淡的短弧
+  g.globalAlpha=.06;g.strokeStyle='#6b5a3a';for(let i=0;i<500;i++){const X=R()*1920,Y=R()*1080,L=8+R()*26,a=R()*6.28;g.lineWidth=.6;g.beginPath();g.moveTo(X,Y);g.quadraticCurveTo(X+Math.cos(a)*L*.5+3,Y+Math.sin(a)*L*.5,X+Math.cos(a)*L,Y+Math.sin(a)*L);g.stroke();}})();
+const bez=(p0,p1,p2,p3,n=90)=>{const r=[];for(let i=0;i<=n;i++){const t=i/n,u=1-t;r.push([u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]]);}return r;};
+/* 艺术线条：一根线 = 一笔。粗细随「笔压」变化（起笔细、行笔饱满、收笔出锋），颜色沿长度从青熟到橙；
+   笔头处有一粒饱满的墨珠，像蘸满颜料的笔尖正在走。 */
+function stroke(pts,prog,{w=2,c0=0,c1=1,wob=.6,seed=1,nib=true,alpha=1}={}){
+  const n=pts.length-1,end=Math.floor(n*clamp(prog));if(end<1)return;
+  x.save();x.globalAlpha=alpha;x.lineCap='round';
+  for(let i=1;i<=end;i++){const t=i/n;const press=Math.sin(Math.PI*Math.min(1,t*1.05))**.55;const head=1+1.6*Math.exp(-(end-i)*.35);
+    const jit=Math.sin(i*.9+seed*7)*wob;x.strokeStyle=ripe(lerp(c0,c1,t));x.lineWidth=Math.max(.5,w*press*head);
+    x.beginPath();x.moveTo(pts[i-1][0],pts[i-1][1]+jit*.5);x.lineTo(pts[i][0],pts[i][1]+jit);x.stroke();}
+  if(nib&&prog<1){const [hx,hy]=pts[end];x.fillStyle=ripe(lerp(c0,c1,end/n));x.beginPath();x.ellipse(hx,hy,w*1.9,w*1.4,0,0,7);x.fill();}
+  x.restore();}
+function T(s,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||22}px ${FONT}`;x.fillStyle=o.c||PAL.ink;x.textAlign=o.a||'left';x.globalAlpha=o.op??1;x.letterSpacing=(o.ls||0)+'px';x.fillText(s,X,Y);x.restore();}
+// 文字：从左到右被「笔」写出（裁切擦出，不是淡入）
+function W(s,X,Y,o,p){if(p<=0)return;x.save();x.font=`${o.w||400} ${o.s||22}px ${FONT}`;const w=x.measureText(s).width;x.beginPath();x.rect(X-4,Y-o.s*1.1,(w+8)*eio(p),o.s*1.5);x.clip();T(s,X,Y,o);x.restore();}
+
+/* 样张内容：三条来源（各一束 9 根线）→ 汇成问题清单 → 下钻 → 分成 点 / 线 / 面 */
+const SRC=[{n:'前线提报',y:320},{n:'经营识别',y:540},{n:'专家巡检',y:760}];
+const BUNDLES=SRC.map((s,k)=>[...Array(9)].map((_,j)=>{const o=(j-4)*6;return bez([120,s.y+o],[520,s.y+o],[640,540+o*.45+(k-1)*12],[900,540+o*.45+(k-1)*12]);}));
+const OUT=[{n:'一般操作问题',t:'点',y:330},{n:'复杂流程问题',t:'线',y:540},{n:'重大业务问题',t:'面',y:750}];
+const FAN=OUT.map((o,k)=>[...Array(9)].map((_,j)=>{const off=(j-4)*(k===2?14:k===1?6:2.2);return bez([1160,540+(j-4)*3],[1300,540+(j-4)*3],[1320,o.y+off],[1500,o.y+off]);}));
+function frame(t){x.setTransform(1,0,0,1,0,0);x.drawImage(paper,0,0);
+  T('线条样张 · 橙黄橘绿',110,96,{s:22,w:600,c:'#A0701E',ls:4});
+  W('颜色就是成熟度：青 → 橘绿 → 黄 → 橙',108,162,{s:50,w:650,ls:-1},win(t,.2,1.4));
+  // 色谱条
+  const sw=win(t,.6,1.6);for(let i=0;i<4;i++){const X=112+i*170;x.fillStyle=`rgb(${STOPS[i]})`;x.globalAlpha=exo(win(sw,i*.2,i*.2+.5));x.beginPath();x.roundRect(X,196,150,14,7);x.fill();x.globalAlpha=1;
+    T(['青 · 现状','橘绿 · 诊断','黄 · 成形','橙 · 见效'][i],X,236,{s:17,c:PAL.mute,op:exo(win(sw,i*.2,i*.2+.5))});}
+  // 三束来源：每束 9 笔，错开起笔，像同一只手连写
+  BUNDLES.forEach((B,k)=>{B.forEach((pts,j)=>stroke(pts,eio(win(t,1.6+k*.35+j*.05,3.6+k*.35+j*.05)),{w:1.5,c0:0,c1:.28,seed:k*9+j}));
+    W(SRC[k].n,120,SRC[k].y-40,{s:26,w:650,c:`rgb(${PAL.青})`},win(t,1.8+k*.35,2.6+k*.35));});
+  // 汇流处：一颗墨珠，越聚越饱满，然后被拉成一道墨线（液体的颈）
+  const pool=exo(win(t,3.8,4.6));if(pool>0){const neck=eio(win(t,4.6,5.6));x.fillStyle=ripe(.3);x.beginPath();x.ellipse(lerp(910,1030,neck*.5),540,lerp(6,26,pool)*(1-neck*.4),lerp(6,30,pool)*(1-neck*.55),0,0,7);x.fill();
+    if(neck>0){x.beginPath();x.moveTo(910,540-24*(1-neck));x.bezierCurveTo(1000,540-10,1060,540-4,lerp(910,1160,neck),540);x.bezierCurveTo(1060,544,1000,550,910,540+24*(1-neck));x.fill();}}
+  W('问题清单',930,500,{s:22,w:650},win(t,4.4,5.2));
+  // 出口：一束线按「改多深」张开 —— 点（收拢）/ 线（平行）/ 面（铺开成等高线）
+  FAN.forEach((B,k)=>{B.forEach((pts,j)=>stroke(pts,eio(win(t,5.6+k*.3+j*.04,7.4+k*.3+j*.04)),{w:k===0?1.3:1.5,c0:.32,c1:[.55,.75,1][k],seed:30+k*9+j}));
+    const p=win(t,7+k*.3,7.8+k*.3);if(p>0){const o=OUT[k];W(o.n,1540,o.y-12,{s:28,w:650},p);W('· '+o.t,1540+o.n.length*28+8,o.y-12,{s:26,w:650,c:ripe([.55,.75,1][k])},p);}});
+  // 面：等高线一圈圈漫开（液体）
+  const sp=win(t,7.6,9.6);if(sp>0){for(let r=0;r<9;r++){const rr=eio(clamp(sp*1.3-r*.06))*(14+r*12);if(rr<1)continue;x.strokeStyle=ripe(1-r*.06);x.lineWidth=1.2;x.globalAlpha=1-r*.07;x.beginPath();
+      for(let a=0;a<=72;a++){const th=a/72*6.283;const wv=1+.12*Math.sin(th*3+r*.5+t*.9);const X=1660+Math.cos(th)*rr*wv*1.1,Y=860+Math.sin(th)*rr*wv*.5;a?x.lineTo(X,Y):x.moveTo(X,Y);}x.closePath();x.stroke();}x.globalAlpha=1;}
+  T('笔压起伏 · 墨珠笔头 · 一束九笔连写 · 汇流时有液体的颈 · 颜色沿线成熟',110,1030,{s:17,c:PAL.mute,op:win(t,8.8,9.6)});
+}
+let t0=performance.now();const TT=11;
+function loop(n){const t=Math.min((n-t0)/1000,TT);frame(t);if((n-t0)/1000>TT+2.5)t0=n;requestAnimationFrame(loop);}
+document.getElementById('rs').onclick=()=>t0=performance.now();
+const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();};document.getElementById('fs').onclick=fs;c.ondblclick=fs;document.onkeydown=e=>{if(e.key==='f'||e.key==='F')fs();};
+const q=new URLSearchParams(location.search).get('t');
+document.fonts.ready.then(()=>{if(q!==null){frame(+q);window.__ready=true;}else{t0=performance.now();requestAnimationFrame(loop);}});
+</script></body></html>
