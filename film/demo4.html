@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>议题三 · demo</title>
+<link rel="stylesheet" href="../fonts/MiSansVF.min.css">
+<style>
+html,body{margin:0;height:100%;background:#FBF8F0;overflow:hidden}
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{width:min(100vw,177.78vh);height:min(56.25vw,100vh);display:block}
+#bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:min(420px,46vw);height:26px;cursor:pointer;transition:opacity .5s;touch-action:none}
+#trk{position:absolute;left:0;right:0;top:12px;height:2px;border-radius:2px;background:rgba(34,48,31,.16)}
+#fil{height:100%;width:0;border-radius:2px;background:linear-gradient(90deg,#56964A,#A8B234,#F6BE2C,#F27026)}
+#thumb{position:absolute;top:13px;left:0;transform:translate(-50%,-50%);font:700 11px "MiSans VF","PingFang SC",sans-serif;letter-spacing:1px;color:#FBF8F0;background:#22301F;border-radius:999px;padding:3px 8px 3px 9px;white-space:nowrap}
+.idle #bar{opacity:0;pointer-events:none}
+</style></head>
+<body><div class="stage"><canvas id="c" width="1920" height="1080"></canvas></div>
+<div id="bar"><div id="trk"><div id="fil"></div></div><div id="thumb">专业</div></div>
+<script>
+const c=document.getElementById('c'),x=c.getContext('2d');
+const FONT='"MiSans VF","PingFang SC","Microsoft YaHei",sans-serif';
+const INK='#22301F',MUTE='#7E806F',PAPER='#FBF8F0',OR4='#B4521F';
+const STOPS=[[86,150,74],[168,178,52],[246,190,44],[242,112,38]];
+const rip=t=>{t=Math.max(0,Math.min(1,t))*3;const i=Math.min(2,Math.floor(t)),f=t-i,a=STOPS[i],b=STOPS[i+1];return a.map((v,k)=>v+(b[k]-v)*f);};
+const rgb=(a,al=1)=>`rgba(${a.map(Math.round)},${al})`;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v)),lerp=(a,b,t)=>a+(b-a)*t,win=(t,a,b)=>clamp((t-a)/(b-a));
+const eio=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+let sd=11;const R=()=>(sd=(sd*16807)%2147483647)/2147483647;
+const paper=document.createElement('canvas');paper.width=1920;paper.height=1080;(()=>{const g=paper.getContext('2d');g.fillStyle=PAPER;g.fillRect(0,0,1920,1080);
+  const n=document.createElement('canvas');n.width=640;n.height=360;const ng=n.getContext('2d');const im=ng.createImageData(640,360);for(let i=0;i<640*360;i++){const v=232+R()*23;im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=v;im.data[i*4+3]=255;}ng.putImageData(im,0,0);
+  g.globalCompositeOperation='multiply';g.globalAlpha=.12;g.drawImage(n,0,0,1920,1080);g.globalCompositeOperation='source-over';g.globalAlpha=1;
+  g.strokeStyle='rgba(34,48,31,.04)';for(let i=40;i<1920;i+=40){g.beginPath();g.moveTo(i+.5,0);g.lineTo(i+.5,1080);g.stroke();}for(let i=40;i<1080;i+=40){g.beginPath();g.moveTo(0,i+.5);g.lineTo(1920,i+.5);g.stroke();}})();
+function T(s,X,Y,o={}){x.save();x.font=`${o.w||400} ${o.s||26}px ${FONT}`;x.fillStyle=o.c||INK;x.textAlign=o.a==='middle'?'center':(o.a||'left');x.globalAlpha=o.op??1;x.letterSpacing=(o.ls||0)+'px';x.fillText(s,X,Y);x.restore();}
+// 文字：擦出 / 擦走（不淡入）
+function W(s,X,Y,o,a,b){const pa=eio(win(NOW,a,a+.8)),pb=eio(win(NOW,b,b+.5));if(pa<=0||pb>=1)return;x.save();x.font=`${o.w||400} ${o.s||26}px ${FONT}`;x.letterSpacing=(o.ls||0)+'px';const w=x.measureText(s).width+10;
+  const L=o.a==='middle'||o.a==='center'?X-w/2:o.a==='right'?X-w:X;x.beginPath();x.rect(L-6+w*pb,Y-o.s*1.15,w*pa-w*pb+6,o.s*1.6);x.clip();T(s,X,Y,o);x.restore();}
+const hair=(pts,al=.3,w=1.2,dash)=>{x.save();x.strokeStyle=`rgba(34,48,31,${al})`;x.lineWidth=w;if(dash)x.setLineDash(dash);x.beginPath();pts.forEach((p,i)=>i?x.lineTo(...p):x.moveTo(...p));x.stroke();x.restore();};
+function head(eb,ti,sub,a,b){W(eb,110,100,{s:24,w:650,c:OR4,ls:5},a,b);W(ti,106,178,{s:64,w:700,ls:-1.5},a+.15,b);if(sub)W(sub,110,228,{s:28,c:MUTE},a+.35,b);}
+let NOW=0;
+
+/* ═════ 40 根线，每根 = 20 条需求（示意）；根因所在层决定它钻多深、怎么处理 ═════ */
+const N=40,M=64;
+const D=[...Array(N)].map((_,i)=>{const src=i<16?0:i<28?1:2;const layer=[0,0,1,3,1,2,0,3,1,0][i%10];const tier=layer===0?0:layer===3?2:1;
+  return {i,src,layer,tier,size:.5+R(),gx:i%8,gy:(i/8)|0,ang:R()*6.283,dx:R(),dy:R(),seed:R()*10};});
+const TIER=[0,1,2].map(k=>D.filter(d=>d.tier===k));const LAYC=[0,1,2,3].map(k=>D.filter(d=>d.layer===k).length);
+const seg=(a,b,c2,d2)=>[...Array(M)].map((_,j)=>{const t=j/(M-1);return [lerp(a,c2,t),lerp(b,d2,t)];});
+const circ=(X,Y,r)=>[...Array(M)].map((_,j)=>{const t=j/(M-1)*6.283;return [X+Math.cos(t)*r,Y+Math.sin(t)*r];});
+const bz=(p0,p1,p2,p3,n=M)=>[...Array(n)].map((_,j)=>{const t=j/(n-1),u=1-t;return [u*u*u*p0[0]+3*u*u*t*p1[0]+3*u*t*t*p2[0]+t*t*t*p3[0],u*u*u*p0[1]+3*u*u*t*p1[1]+3*u*t*t*p2[1]+t*t*t*p3[1]];});
+const blob=(X,Y,rx,ry,k)=>[...Array(M)].map((_,j)=>{const t=j/(M-1)*6.283;const w=1+.08*Math.sin(t*3+k*.6)+.04*Math.sin(t*5-k);return [X+Math.cos(t)*rx*w,Y+Math.sin(t)*ry*w];});
+const LAYY=[380,500,620,740],BH=110;            // 四层地层
+const COL=[380,960,1540],FY=640;                // 三条流程
+const SX=i=>200+i*304,SY=560;                   // 六阶段
+const ST=[
+ // 0 · 1700 个工具：一格一格的点
+ d=>({pts:circ(640+d.gx*160+(d.gy%2)*40,300+d.gy*140,(8+d.size*10)*.15),w:8+d.size*10,c:.02}),
+ // 1 · 点状需求：方向各异的短划
+ d=>{const X=560+d.dx*1250,Y=300+d.dy*640,L=40+d.size*50;return {pts:seg(X-Math.cos(d.ang)*L/2,Y-Math.sin(d.ang)*L/2,X+Math.cos(d.ang)*L/2,Y+Math.sin(d.ang)*L/2),w:3,c:.05};},
+ // 2 · 三个来源汇进问题清单
+ d=>{const ys=[380,580,780][d.src],k=d.i-(d.src===0?0:d.src===1?16:28),cnt=d.src===0?16:12,o=(k-(cnt-1)/2)*8;const ty=580+(d.i-19.5)*6;
+   return {pts:bz([560,ys+o],[900,ys+o],[1000,ty],[1300,ty]),w:2.2,c:.18};},
+ // 3 · 往下钻：每根线竖着往下，停在根因所在的那一层
+ d=>{const X=700+d.i*20;return {pts:seg(X,300,X,LAYY[d.layer]+78),w:3,c:.28+d.layer*.18};},
+ // 4 · 点 / 线 / 面：在同一条五步流程里
+ d=>{const k=TIER[d.tier].indexOf(d),X=COL[d.tier];
+   if(d.tier===0){const a=k/TIER[0].length*6.283,r=6+(k%3)*7;return {pts:circ(X+Math.cos(a)*r*1.4,FY+Math.sin(a)*r*.8,2),w:11,c:.45};}
+   if(d.tier===1){const o=(k-(TIER[1].length-1)/2)*4.2;return {pts:seg(X-200,FY+o,X+100,FY+o),w:2.2,c:.68};}
+   return {pts:blob(X,FY,150+k*14,30+k*7,k),w:1.8,c:.86+k*.015};},
+ // 5 · 六阶段：拧成一股，沿流程往前走，越走越熟
+ d=>{const o=(d.i-19.5)*1.6;return {pts:[...Array(M)].map((_,j)=>{const t=j/(M-1);return [lerp(200,1720,t),SY+o+Math.sin(t*9+d.i*.6)*2.2];}),w:1.6,c:-1};},
+ // 6 · 复制推广：末端分成三股，流向其他条线
+ d=>{const g=d.i%3,tx=[1580,1700,1820][g],o=(d.i-19.5)*1.6;return {pts:[...Array(M)].map((_,j)=>{const t=j/(M-1);const X=lerp(200,1720,Math.min(1,t/.86));
+   if(t<.86)return [X,SY+o+Math.sin(t*9+d.i*.6)*2.2];const u=(t-.86)/.14;const p=bz([1720,SY+o],[1780,SY+o],[tx,SY+140],[tx,870],12)[Math.round(u*11)];return p;}),w:1.6,c:-1};},
+];
+const KT=[0,4.2,7.0,11.6,18.4,25.0,32.2];
+const MP=48;
+function resample(pts){const L=[0];for(let i=1;i<pts.length;i++)L.push(L[i-1]+Math.hypot(pts[i][0]-pts[i-1][0],pts[i][1]-pts[i-1][1]));
+  const tot=L[L.length-1]||1,out=new Float32Array(MP*2);let j=0;
+  for(let i=0;i<MP;i++){const s=tot*i/(MP-1);while(j<L.length-2&&L[j+1]<s)j++;const f=Math.min(1,(s-L[j])/((L[j+1]-L[j])||1));out[i*2]=pts[j][0]+(pts[j+1][0]-pts[j][0])*f;out[i*2+1]=pts[j][1]+(pts[j+1][1]-pts[j][1])*f;}return out;}
+const CACHE=ST.map(fn=>D.map(d=>{const S=fn(d);return {p:resample(S.pts),w:S.w,c:S.c};}));
+const spring=(t,w=6.5,z=.6)=>{if(t<=0)return 0;const q=Math.sqrt(1-z*z);return 1-Math.exp(-z*w*t)*(Math.cos(w*q*t)+z/q*Math.sin(w*q*t));};
+const BUF=D.map(()=>new Float32Array(MP*2)),LX=new Float32Array(MP*2),RX=new Float32Array(MP*2);
+// 形变：每个点从上一形状的对应点连续滑到下一形状的对应点；线头先走、线尾跟上；途中走弧线；弹簧落定
+function shapeAt(d,t){let s=0;while(s<KT.length-1&&t>=KT[s+1])s++;const B=CACHE[s][d.i],out=BUF[d.i];
+  if(s===0)out.set(B.p);else{const A=CACHE[s-1][d.i],t0=t-KT[s]-(d.i/N)*.5,side=Math.sin(d.seed*6.1)*30;
+    for(let j=0;j<MP;j++){const k=spring(t0-j/MP*.25);const arc=Math.sin(Math.PI*clamp(k))*side;out[j*2]=A.p[j*2]+(B.p[j*2]-A.p[j*2])*k;out[j*2+1]=A.p[j*2+1]+(B.p[j*2+1]-A.p[j*2+1])*k+arc;}}
+  const k=s===0?1:clamp(spring(t-KT[s]-(d.i/N)*.5));const A=s===0?B:CACHE[s-1][d.i];
+  const amp=(B.w>8?.6:1.8)*k;for(let j=0;j<MP;j++)out[j*2+1]+=Math.sin(j*.3-t*2.4+d.seed)*amp;
+  const kw=B.w<A.w?Math.min(1,k*2.2):k,ca=A.c<0?.5:A.c;return {p:out,w:A.w+(B.w-A.w)*kw,c:B.c<0?-1:ca+(B.c-ca)*k};}
+let GRAD=null;
+function drawLine(S){const p=S.p;
+  for(let j=0;j<MP;j++){const a=Math.max(0,j-1),b=Math.min(MP-1,j+1);let nx=-(p[b*2+1]-p[a*2+1]),ny=p[b*2]-p[a*2];const l=Math.hypot(nx,ny)||1;nx/=l;ny/=l;
+    const t=j/(MP-1),hw=S.w*(.5+.5*Math.sin(Math.PI*t))*.5+.35;LX[j*2]=p[j*2]+nx*hw;LX[j*2+1]=p[j*2+1]+ny*hw;RX[j*2]=p[j*2]-nx*hw;RX[j*2+1]=p[j*2+1]-ny*hw;}
+  x.beginPath();x.moveTo(LX[0],LX[1]);for(let j=1;j<MP;j++)x.lineTo(LX[j*2],LX[j*2+1]);for(let j=MP-1;j>=0;j--)x.lineTo(RX[j*2],RX[j*2+1]);x.closePath();
+  if(S.c<0){if(!GRAD){GRAD=x.createLinearGradient(200,0,1800,0);STOPS.forEach((s,i)=>GRAD.addColorStop(i/3,rgb(s)));}x.fillStyle=GRAD;}else x.fillStyle=rgb(rip(S.c),.95);x.fill();}
+function beads(d,S,t){if(S.w>8)return;const p=S.p,dx=p[(MP-1)*2]-p[0],dy=p[(MP-1)*2+1]-p[1];if(dx*dx+dy*dy<250*250)return;
+  const u=(t*.3+d.seed*.1)%1,j=Math.floor(u*(MP-2));const a=Math.atan2(p[j*2+3]-p[j*2+1],p[j*2+2]-p[j*2]);
+  x.fillStyle=rgb((S.c<0?rip(u):rip(S.c)).map(v=>v*.8));x.beginPath();x.ellipse(p[j*2],p[j*2+1],S.w*2+3,S.w*.9+1.2,a,0,7);x.fill();}
+
+/* ═════ 编辑排版层：每一场的字，都对着画面里的东西 ═════ */
+const MICRO=document.createElement('canvas');MICRO.width=1920;MICRO.height=1080;{const g=MICRO.getContext('2d');g.fillStyle='rgba(86,150,74,.28)';for(let i=0;i<1700;i++)g.fillRect(560+(i%85)*15.5,280+((i/85)|0)*31,2,2);}
+function overlay(t){
+  // 0 · 现状
+  head('现状摸底','1700+ 个工具，彼此不相连','员工学会了用工具，科技还没有成为生产组织方式的一部分。',.2,3.9);
+  const mg=win(t,.2,1)*(1-win(t,3.6,4.4));if(mg>0){x.globalAlpha=mg;x.drawImage(MICRO,0,0);x.globalAlpha=1;}
+  W('1000+',110,560,{s:80,w:300,ls:-2},.8,3.9);W('认证数字化专才',114,604,{s:28,c:MUTE},.9,3.9);
+  W('1700+',110,740,{s:80,w:300,ls:-2},1.0,3.9);W('年度开发工具 · 一粒 = 一个工具',114,784,{s:28,c:MUTE},1.1,3.9);
+  // 1 · 点状需求
+  head('现状问题','需求多是「点状」的','员工提出希望自动整理报表，最终开发了一个自动汇总工具。',4.4,6.7);
+  W('只问了「要什么工具」',110,820,{s:34,w:700},4.9,6.7);W('没问「为什么要人工整理、数据为什么不能直接取」',112,864,{s:26,c:MUTE},5.1,6.7);
+  // 2 · 三个来源 → 问题清单
+  head('变化 1 · 需求发现','从被动接单，到主动发现问题','三个来源，按统一字段汇成一张问题清单。',7.2,11.3);
+  [['前线提报','员工提报 · 访谈 · 使用反馈',380,16],['经营识别','件均 · 差错率 · 同业对比',580,12],['专家巡检','跟一笔业务从受理到交付',780,12]].forEach(([a,b,y,n],i)=>{
+    W(a,110,y-50,{s:36,w:700,c:rgb(STOPS[0])},7.8+i*.2,11.3);W(b+' · '+n+' 根',112,y-12,{s:24,c:MUTE},8.0+i*.2,11.3);});
+  const lp=win(t,8.4,9);if(lp>0&&t<11.6){x.save();x.globalAlpha=lp*(1-win(t,11.2,11.6));hair([[1300,440],[1300,720]],.6,2);x.restore();}
+  W('问题清单',1340,440,{s:36,w:700},8.6,11.3);
+  ['问题来源','涉及业务 / 岗位 / 系统','具体问题 · 影响范围','发生次数和人工','当前处理方式','诊断负责人 · 后续状态'].forEach((f,i)=>W('✓  '+f,1342,496+i*44,{s:28},9.0+i*.2,11.3));
+  // 3 · 往下钻四层
+  head('变化 2 · 响应评审','先找根因：往下钻四层','一根线往下钻，停在它的根因所在的那一层。',11.8,18.1);
+  const L4=[['操作环节','是否重复、复杂、高耗时？','自动化工具 / 智能体 / 功能优化'],['业务流程','是否衔接不顺、重复传递？','流程简化 / 环节合并 / 系统打通'],['业务规则','是否标准不统一、规则过多？','规则统一 / 标准调整 / 自动执行'],['生产分工','是否分工不合理、人工做标准任务？','人机分工调整 / 岗位重配']];
+  L4.forEach(([n,q,s],i)=>{const y=LAYY[i];const a=eio(win(t,12.0+i*.15,12.9+i*.15))*(1-eio(win(t,18.1,18.7)));if(a>0){x.fillStyle=`rgba(86,150,74,${(.06+i*.04)*a})`;x.fillRect(140,y,1640*a,BH-8);}
+    W(n,170,y+52,{s:36,w:700},12.2+i*.15,18.1);W(q,172,y+88,{s:22,c:MUTE},12.4+i*.15,18.1);
+    W(LAYC[i]+' 根停在这一层',1560,y+44,{s:26,w:700,c:rgb(rip(.28+i*.18))},14.6+i*.3,18.1);W('→ '+s,1560,y+80,{s:20,c:MUTE},14.8+i*.3,18.1);});
+  W('不是每个问题都要走完四层，也不是层次越高越好。',110,920,{s:28,w:650},16.2,18.1);
+  // 4 · 点线面
+  head('变化 2 · 分级处理','按根因深度，选方案：点 · 线 · 面','同一条流程：取数 → 整理 → 汇总 → 检查 → 传递，改动深度不同。',18.6,24.7);
+  const CT=[['一般操作问题 · 点','现有工具复用 · 轻量开发','数字化专才快速处理','1–2 周上线'],['复杂流程问题 · 线','流程优化 · 系统整合 · 规则调整','方案专家牵头，业务科技联合','2–4 周见效'],['重大业务问题 · 面','重新设计流程、规则、岗位分工','公司统筹，专项改造项目','1–3 个月推进']];
+  CT.forEach((cc,k)=>{const X=COL[k];W(cc[0],X,420,{s:34,w:700,a:'middle'},19.0+k*.2,24.7);
+    const a=eio(win(t,19.2+k*.2,20+k*.2))*(1-eio(win(t,24.7,25.2)));if(a>0){x.save();x.globalAlpha=a;hair([[X-230,FY],[X+230,FY]],.25,2);['取数','整理','汇总','检查','传递'].forEach((s,i)=>{const nx=X-200+i*100;x.fillStyle=PAPER;x.strokeStyle=INK;x.lineWidth=2;x.beginPath();x.arc(nx,FY,8,0,7);x.fill();x.stroke();T(s,nx,FY+56,{s:24,a:'center',c:MUTE});});x.restore();}
+    W(TIER[k].length+' 根',X,480,{s:24,a:'middle',c:rgb(rip([.45,.68,.9][k])),w:700},20.4+k*.2,24.7);
+    W(cc[1],X,790,{s:27,a:'middle'},21.0+k*.3,24.7);W(cc[2],X,830,{s:25,a:'middle',c:MUTE},21.2+k*.3,24.7);W(cc[3],X,876,{s:30,a:'middle',w:700,c:OR4},21.4+k*.3,24.7);});
+  W('避免把所有业务问题都变成工具开发任务。',960,960,{s:30,w:700,a:'middle'},22.8,24.7);
+  // 5 · 六阶段
+  head('变化 3 · 方案落地','从开发交付，到生产效果','业务不以需求审核为结束，科技不以需求上线为结束。',25.2,99);
+  ['方案确认','联合设计','实施开发','现场试点','效果验收','复制推广'].forEach((s,i)=>{const X=SX(i),ta=26.4+i*.8;const a=eio(win(t,ta,ta+.4));
+    if(a>0){x.fillStyle=PAPER;x.strokeStyle=INK;x.lineWidth=2.5;x.beginPath();x.arc(X,SY,12*a,0,7);x.fill();x.stroke();}
+    W(s,X,SY-46,{s:32,w:700,a:'middle'},ta,99);W(['项目实施方案','新流程 / 规则 / 技术设计','可试运行的方案','试点运行结果','业务验收和价值报告',''][i],X,SY+66,{s:26,a:'middle',c:OR4,w:600},ta+.3,99);});
+  W('5 人  →  释放 3.5 人',1300,740,{s:56,w:700,a:'middle',c:OR4},30.2,99);W('考勤审核原流程（示例，理论测算）· 以财务结果为唯一衡量标准',1300,786,{s:22,a:'middle',c:MUTE},30.5,99);
+  [['其他条线',1580],['其他部门',1700],['下一场景',1820]].forEach(([n,X],i)=>W(n,X,904,{s:24,w:650,a:'middle'},33.0+i*.15,99));W('可复制的成熟方案',1700,950,{s:26,w:600,a:'middle',c:OR4},33.4,99);
+  W('一个单点诉求，被解决为一套更有效的生产方式。',110,1000,{s:48,w:700,ls:-1},34.0,99);
+  // 读图方法（前段）
+  const lg=win(t,7.4,8.2)*(1-win(t,24.7,25.2));if(lg>0){x.save();x.globalAlpha=lg;const X=110,Y=1000;x.strokeStyle=rgb(rip(.1));x.lineWidth=2.4;x.beginPath();x.moveTo(X,Y);x.lineTo(X+44,Y);x.stroke();
+    T('一根线 = 20 条需求（示意）',X+56,Y+8,{s:20,c:MUTE});for(let i=0;i<4;i++){x.fillStyle=rgb(STOPS[i]);x.fillRect(X+360+i*14,Y-6,12,12);}T('颜色 = 成熟度：青 → 橙',X+426,Y+8,{s:20,c:MUTE});x.restore();}
+}
+function frame(t){NOW=t;x.setTransform(1,0,0,1,0,0);x.globalAlpha=1;x.drawImage(paper,0,0);
+  for(const d of D){const S=shapeAt(d,t);drawLine(S);beads(d,S,t);}overlay(t);}
+
+/* ═════ 播放 ═════ */
+const TT=36;let t0=performance.now(),paused=false,pt=0,drag=false,idleT;
+const fil=document.getElementById('fil'),thumb=document.getElementById('thumb'),bar=document.getElementById('bar');
+function wake(){document.body.classList.remove('idle');clearTimeout(idleT);idleT=setTimeout(()=>{if(!paused&&!drag)document.body.classList.add('idle');},1500);}
+document.addEventListener('mousemove',wake);document.addEventListener('touchstart',wake);
+const seekAt=e=>{const r=document.getElementById('trk').getBoundingClientRect();pt=clamp((e.clientX-r.left)/r.width)*TT;t0=performance.now()-pt*1000;};
+bar.onpointerdown=e=>{drag=true;bar.setPointerCapture(e.pointerId);seekAt(e);wake();};bar.onpointermove=e=>{if(drag)seekAt(e);};bar.onpointerup=()=>{drag=false;wake();};
+function loop(n){if(!paused&&!drag){pt=(n-t0)/1000;if(pt>TT+2){t0=n;pt=0;}}const f=Math.min(pt,TT)/TT*100;fil.style.width=f+'%';thumb.style.left=f+'%';frame(Math.min(pt,TT));requestAnimationFrame(loop);}
+const fs=()=>{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();};c.ondblclick=fs;
+document.onkeydown=e=>{if(e.key==='f'||e.key==='F')fs();if(e.key===' '){e.preventDefault();paused=!paused;if(!paused)t0=performance.now()-pt*1000;wake();}};
+const q=new URLSearchParams(location.search).get('t');
+document.fonts.ready.then(()=>{if(q!==null){frame(+q);window.__ready=true;}else{t0=performance.now();wake();requestAnimationFrame(loop);}});
+window.frame=frame;
+</script></body></html>
